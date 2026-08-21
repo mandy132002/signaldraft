@@ -1,0 +1,123 @@
+export type RunStatus = "running" | "succeeded" | "failed" | "needs_review" | "approved" | "rejected";
+
+export type StageStatus = "pending" | "running" | "done" | "error";
+
+export type SignalKind =
+  | "news"
+  | "hiring"
+  | "funding"
+  | "product"
+  | "leadership"
+  | "company";
+
+export type Signal = {
+  id: string;
+  kind: SignalKind;
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  publishedAt?: string;
+  relevance: number;
+  why: string;
+  eligible?: boolean;
+  /** How the name matched before LLM entity check */
+  matchTier?: "exact" | "soft" | "person" | "suspect" | "context";
+};
+
+export type StageEvent = {
+  id: string;
+  label: string;
+  detail: string;
+  status: StageStatus;
+  at: string;
+  /** When this stage entered running (ISO) */
+  startedAt?: string;
+  /** Final elapsed ms when stage finished */
+  durationMs?: number;
+};
+
+export type ProspectInput = {
+  fullName: string;
+  title: string;
+  company: string;
+  linkedinUrl?: string;
+  notes?: string;
+  senderName?: string;
+  senderCompany?: string;
+  senderOffer?: string;
+};
+
+export type OutreachDraft = {
+  subject: string;
+  body: string;
+  hook: string;
+  confidence: "high" | "medium" | "low";
+  usedSignalIds: string[];
+  model: string;
+};
+
+export type HookAnalysis = {
+  sentiment: "positive" | "neutral" | "negative" | "mixed";
+  sentimentWhy: string;
+  businessImpact: string;
+  outreachAngle: string;
+  toneGuidance: string;
+  riskFlags: string[];
+};
+
+export type RunRecord = {
+  id: string;
+  /** Owner from Google / Auth.js session */
+  userId: string;
+  /** Optional link to a bulk CSV job */
+  bulkJobId?: string;
+  createdAt: string;
+  updatedAt: string;
+  status: RunStatus;
+  prospect: ProspectInput;
+  stages: StageEvent[];
+  signals: Signal[];
+  chosenSignal?: Signal;
+  analysis?: HookAnalysis;
+  entityNote?: string;
+  draft?: OutreachDraft;
+  error?: string;
+  reviewNote?: string;
+};
+
+export type BulkItemStatus = "pending" | "running" | "done" | "failed" | "skipped";
+
+export type BulkJobStatus = "queued" | "running" | "completed" | "cancelled";
+
+export type BulkItem = {
+  index: number;
+  prospect: ProspectInput;
+  status: BulkItemStatus;
+  runId?: string;
+  error?: string;
+  updatedAt: string;
+  /** When research started for this row */
+  startedAt?: string;
+  /** Elapsed ms for this row when finished */
+  durationMs?: number;
+};
+
+export type BulkJob = {
+  id: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  /** When the first prospect started processing */
+  startedAt?: string;
+  /** When every item reached a terminal status */
+  completedAt?: string;
+  status: BulkJobStatus;
+  fileName: string;
+  defaults: {
+    senderName: string;
+    senderCompany: string;
+    senderOffer: string;
+  };
+  items: BulkItem[];
+};
