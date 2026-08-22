@@ -491,7 +491,7 @@ export function distinctiveCompanyTokens(company: string): string[] {
 
 /**
  * Soft recall: keep items that might be about this company/person.
- * False positives (Cube Logic vs Cube Global) are OK here — Ollama decides later.
+ * False positives (Cube Logic vs Cube Global) are OK here — LLM decides later.
  */
 export function isSoftCandidate(
   text: string,

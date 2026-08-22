@@ -4,7 +4,7 @@ Live process: **prospect → public research → exact-match ranking → LLM ana
 
 Auth: **Google sign-in** via Auth.js. Data: **MongoDB** (runs scoped to your Google account).
 
-LLM: **Groq** (free, for Vercel) or **Ollama** (local). If `GROQ_API_KEY` is set, Groq is used automatically.
+LLM: **Groq** (cloud). Set `GROQ_API_KEY` locally and on Vercel.
 
 ## Manual setup (required once)
 
@@ -56,24 +56,14 @@ Fill `.env.local`:
 | `GOOGLE_CLIENT_SECRET` | from Google Cloud |
 | `MONGODB_URI` | Atlas connection string |
 | `MONGODB_DB` | `signaldraft` (or leave default) |
-| `GROQ_API_KEY` | optional locally; **required on Vercel** |
+| `GROQ_API_KEY` | from [console.groq.com](https://console.groq.com/keys) |
+| `GROQ_MODEL` | `openai/gpt-oss-20b` (optional) |
 
-### 4. LLM — local Ollama **or** free Groq
-
-**Local (optional if you use Groq):**
-
-```bash
-ollama serve
-ollama pull llama3.2:3b
-```
-
-**Free cloud LLM (Groq)** — use this for Vercel:
+### 4. Groq API key
 
 1. Create an account at [https://console.groq.com](https://console.groq.com)
 2. **API Keys** → create a key
-3. Set `GROQ_API_KEY=...` (default model: `openai/gpt-oss-20b`)
-
-If `GROQ_API_KEY` is present, the app uses Groq. Otherwise it uses Ollama.
+3. Set `GROQ_API_KEY=...` in `.env.local` (default model: `openai/gpt-oss-20b`)
 
 ### 5. Run the app locally
 
@@ -112,9 +102,6 @@ Collections created automatically in MongoDB: Auth.js (`users`, `accounts`, `ses
 | `MONGODB_DB` | `signaldraft` |
 | `GROQ_API_KEY` | from Groq |
 | `GROQ_MODEL` | `openai/gpt-oss-20b` (optional) |
-| `LLM_PROVIDER` | `groq` (optional but clear) |
-
-Do **not** set `OLLAMA_HOST` on Vercel.
 
 ### D. Google OAuth for production
 
@@ -147,7 +134,7 @@ Click **Deploy**. After it finishes, open the Vercel URL, sign in with Google, r
 | Exact company match | Wikipedia (quoted name) |
 | News / funding / hiring | Google News RSS + Hacker News, exact-name filter |
 | Rank | Keep person+company hooks; drop lookalike collisions |
-| **LLM analysis** | Groq or Ollama → sentiment, business impact, outreach angle |
+| **LLM analysis** | Groq → sentiment, business impact, outreach angle |
 | **Draft** | LLM writes a short sendable email |
 | Review | Approve / reject — **nothing is auto-sent** |
 
@@ -155,6 +142,6 @@ Click **Deploy**. After it finishes, open the Vercel URL, sign in with Google, r
 
 1. Sign in with Google.
 2. Prefill is Jeff Bezos / Amazon (or any public company).
-3. Ensure Groq key **or** `ollama serve` + `llama3.2:3b`.
+3. Ensure `GROQ_API_KEY` is set in `.env.local`.
 4. Hit **Research & draft email**, narrate stages.
 5. Approve and open **Dashboard** (your runs only).

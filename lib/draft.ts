@@ -1,12 +1,12 @@
 import {
-  analyzeWithOllama,
+  analyzeHook,
   applyEntityResolution,
-  draftWithOllama,
-  ollamaAvailable,
-  ollamaModelName,
-  resolveEntitiesWithOllama,
+  draftEmail,
+  llmAvailable,
+  llmModelName,
+  resolveEntities,
   type HookAnalysis,
-} from "./ollama";
+} from "./llm";
 import type { LinkedInContext } from "./linkedin";
 import { offerFit } from "./offer";
 import { pickHook, type RankedSignal } from "./relevance";
@@ -122,16 +122,16 @@ export async function resolveAndAnalyze(
   signals: Signal[];
   hook: Signal | undefined;
   analysis: HookAnalysis | null;
-  ollama: boolean;
+  llm: boolean;
   entityNote: string;
 }> {
-  const up = await ollamaAvailable();
+  const up = await llmAvailable();
   let signals = ranked;
   let entityNote = "No LLM entity check.";
   let preferredHookId: string | null = null;
 
   if (up) {
-    const resolution = await resolveEntitiesWithOllama(prospect, ranked, linkedIn);
+    const resolution = await resolveEntities(prospect, ranked, linkedIn);
     if (resolution) {
       signals = applyEntityResolution(ranked, resolution, prospect);
       entityNote = resolution.note;
@@ -166,14 +166,14 @@ export async function resolveAndAnalyze(
       });
     }
   } else {
-    entityNote = "LLM offline — keeping exact/person matches only.";
+    entityNote = "Groq unavailable — keeping exact/person matches only.";
     signals = ranked.map((s) => {
       if (s.kind === "company") return { ...s, eligible: false };
       const ok = s.matchTier === "exact" || s.matchTier === "person";
       return {
         ...s,
         eligible: !!ok && !!s.eligible,
-        why: ok ? s.why : `LLM offline; soft match not confirmed. ${s.why}`,
+        why: ok ? s.why : `Groq offline; soft match not confirmed. ${s.why}`,
       };
     });
   }
@@ -182,12 +182,12 @@ export async function resolveAndAnalyze(
   if (hook && preferredHookId && hook.id !== preferredHookId) {
     entityNote = `${entityNote} · Hook switched to offer-aligned signal.`;
   }
-  if (!hook) return { signals, hook: undefined, analysis: null, ollama: up, entityNote };
+  if (!hook) return { signals, hook: undefined, analysis: null, llm: up, entityNote };
 
-  if (!up) return { signals, hook, analysis: null, ollama: false, entityNote };
+  if (!up) return { signals, hook, analysis: null, llm: false, entityNote };
 
-  const analysis = await analyzeWithOllama(prospect, hook, signals, linkedIn);
-  return { signals, hook, analysis, ollama: true, entityNote };
+  const analysis = await analyzeHook(prospect, hook, signals, linkedIn);
+  return { signals, hook, analysis, llm: true, entityNote };
 }
 
 export async function writeDraft(
@@ -213,15 +213,15 @@ ${sender}`,
     };
   }
 
-  if (analysis && (await ollamaAvailable())) {
-    const drafted = await draftWithOllama(prospect, hook, ranked, analysis, linkedIn);
+  if (analysis && (await llmAvailable())) {
+    const drafted = await draftEmail(prospect, hook, ranked, analysis, linkedIn);
     if (drafted) return drafted;
   }
 
-  if (!analysis && (await ollamaAvailable())) {
-    const a = await analyzeWithOllama(prospect, hook, ranked, linkedIn);
+  if (!analysis && (await llmAvailable())) {
+    const a = await analyzeHook(prospect, hook, ranked, linkedIn);
     if (a) {
-      const drafted = await draftWithOllama(prospect, hook, ranked, a, linkedIn);
+      const drafted = await draftEmail(prospect, hook, ranked, a, linkedIn);
       if (drafted) return drafted;
       return heuristicDraft(prospect, hook, a);
     }
@@ -230,4 +230,4 @@ ${sender}`,
   return heuristicDraft(prospect, hook, analysis);
 }
 
-export { ollamaModelName, ollamaAvailable };
+export { llmModelName, llmAvailable };

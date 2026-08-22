@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRun, upsertRun } from "@/lib/db";
-import { ollamaAvailable, refineDraftWithOllama } from "@/lib/ollama";
+import { llmAvailable, refineDraft } from "@/lib/llm";
 import { requireUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -30,12 +30,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "No confirmed hook to refine against" }, { status: 400 });
   }
 
-  if (!(await ollamaAvailable())) {
+  if (!(await llmAvailable())) {
     return NextResponse.json(
-      {
-        error:
-          "No LLM available. Set GROQ_API_KEY (Vercel) or start Ollama locally (ollama serve).",
-      },
+      { error: "Groq is not configured. Set GROQ_API_KEY in your environment." },
       { status: 503 }
     );
   }
@@ -46,7 +43,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "No current email body to refine" }, { status: 400 });
   }
 
-  const refined = await refineDraftWithOllama({
+  const refined = await refineDraft({
     prospect: run.prospect,
     hook,
     analysis: run.analysis,
@@ -57,7 +54,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   if (!refined) {
     return NextResponse.json(
-      { error: "Refinement failed — try a clearer prompt or check your LLM (Groq/Ollama)." },
+      { error: "Refinement failed — try a clearer prompt or check Groq." },
       { status: 502 }
     );
   }

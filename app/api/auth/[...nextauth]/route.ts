@@ -11,6 +11,10 @@ function authConfigHint() {
   if (!process.env.GOOGLE_CLIENT_ID) missing.push("GOOGLE_CLIENT_ID");
   if (!process.env.GOOGLE_CLIENT_SECRET) missing.push("GOOGLE_CLIENT_SECRET");
   if (!process.env.MONGODB_URI) missing.push("MONGODB_URI");
+  const authUrl = (process.env.AUTH_URL || "").trim();
+  if (authUrl.startsWith("AUTH_URL=")) {
+    missing.push('AUTH_URL (remove "AUTH_URL=" prefix — value should be only the URL)');
+  }
   return missing;
 }
 

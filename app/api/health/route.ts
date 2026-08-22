@@ -5,9 +5,23 @@ export const runtime = "nodejs";
 
 /** Safe env check for Vercel debugging — never returns secret values. */
 export async function GET() {
+  const rawAuthUrl = process.env.AUTH_URL?.trim() || null;
+  let authUrl = rawAuthUrl;
+  let authUrlProblem: string | null = null;
+
+  if (rawAuthUrl?.startsWith("AUTH_URL=")) {
+    authUrlProblem =
+      'AUTH_URL value includes "AUTH_URL=" prefix — set the value to only https://signaldraft-sand.vercel.app';
+    authUrl = rawAuthUrl.replace(/^AUTH_URL=/, "");
+  }
+  if (authUrl && !/^https?:\/\//.test(authUrl)) {
+    authUrlProblem = "AUTH_URL must start with https:// (no variable name, no quotes)";
+  }
+
   const env = {
     AUTH_SECRET: Boolean(process.env.AUTH_SECRET),
-    AUTH_URL: process.env.AUTH_URL || null,
+    AUTH_URL: authUrl,
+    AUTH_URL_RAW: rawAuthUrl,
     GOOGLE_CLIENT_ID: Boolean(process.env.GOOGLE_CLIENT_ID),
     GOOGLE_CLIENT_SECRET: Boolean(process.env.GOOGLE_CLIENT_SECRET),
     MONGODB_URI: Boolean(process.env.MONGODB_URI),
@@ -20,8 +34,9 @@ export async function GET() {
   const missing = required.filter((k) => !env[k]);
 
   return NextResponse.json({
-    ok: missing.length === 0,
+    ok: missing.length === 0 && !authUrlProblem,
     missing,
+    authUrlProblem,
     env,
   });
 }

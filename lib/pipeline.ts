@@ -1,4 +1,4 @@
-import { resolveAndAnalyze, ollamaModelName, writeDraft } from "./draft";
+import { resolveAndAnalyze, llmModelName, writeDraft } from "./draft";
 import { upsertRun } from "./db";
 import { researchProspect } from "./research";
 import type { ProspectInput, RunRecord, StageEvent } from "./types";
@@ -134,11 +134,11 @@ export async function executeRun(
       run,
       "resolve",
       "running",
-      `LLM (${ollamaModelName()}) deciding which names match ${prospect.company} / ${prospect.fullName}.`
+      `LLM (${llmModelName()}) deciding which names match ${prospect.company} / ${prospect.fullName}.`
     );
     onUpdate(run);
 
-    const { signals, hook, analysis, ollama, entityNote } = await resolveAndAnalyze(
+    const { signals, hook, analysis, llm, entityNote } = await resolveAndAnalyze(
       prospect,
       softRanked,
       linkedIn
@@ -164,15 +164,15 @@ export async function executeRun(
       "analyze",
       "running",
       hook
-        ? `Sentiment + business impact via ${ollamaModelName()}…`
+        ? `Sentiment + business impact via ${llmModelName()}…`
         : "Skipped — no confirmed hook."
     );
     onUpdate(run);
 
     if (!hook) {
       setStage(run, "analyze", "done", "No confirmed entity match to analyze.");
-    } else if (!ollama) {
-      setStage(run, "analyze", "done", "LLM offline — heuristic draft only.");
+    } else if (!llm) {
+      setStage(run, "analyze", "done", "Groq unavailable — heuristic draft only.");
     } else if (!analysis) {
       setStage(run, "analyze", "done", "Analysis empty — drafting with fallback.");
     } else {
@@ -189,7 +189,7 @@ export async function executeRun(
       run,
       "draft",
       "running",
-      ollama ? `Drafting with ${ollamaModelName()}…` : "Writing draft (heuristic)."
+      llm ? `Drafting with ${llmModelName()}…` : "Writing draft (heuristic)."
     );
     onUpdate(run);
     run.draft = await writeDraft(prospect, signals, analysis, linkedIn);
