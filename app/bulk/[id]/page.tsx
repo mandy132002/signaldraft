@@ -7,6 +7,7 @@ import { Shell } from "../../shell";
 import { ClaudeSpark } from "../../ClaudeSpark";
 import { GmailDraftButton } from "../../GmailDraftButton";
 import { bulkElapsedMs, summarizeBulk } from "@/lib/bulk-stats";
+import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { BulkJob, BulkItem, RunRecord } from "@/lib/types";
 
 type Summary = { total: number; done: number; failed: number; pending: number; running: number };
@@ -417,6 +418,16 @@ export default function BulkJobPage() {
                 {selected.prospect.company}
                 {selected.chosenSignal ? ` · Hook: ${selected.chosenSignal.title}` : ""}
               </p>
+              {selected.draft && isHoldDraft(selected.draft) ? (
+                <div className="callout hold">
+                  <strong>Hold — do not send.</strong> No confirmed public hook for this row.
+                </div>
+              ) : selected.draft?.sensitiveHook ||
+                (selected.chosenSignal && signalIsSensitive(selected.chosenSignal)) ? (
+                <div className="callout sensitive">
+                  <strong>Sensitive public event.</strong> Do not congratulate.
+                </div>
+              ) : null}
               <label>Subject</label>
               <input
                 value={subject}
@@ -440,7 +451,7 @@ export default function BulkJobPage() {
               {selected.status === "needs_review" ? (
                 <div className="actions">
                   <button className="btn ok" type="button" disabled={acting} onClick={() => void decide("approved")}>
-                    Approve & store
+                    {selected.draft && isHoldDraft(selected.draft) ? "Store hold (do not send)" : "Approve & store"}
                   </button>
                   <button className="btn bad" type="button" disabled={acting} onClick={() => void decide("rejected")}>
                     Reject & store
@@ -450,7 +461,11 @@ export default function BulkJobPage() {
                 <p className="hint">Already {selected.status}. Pick another prospect in the queue.</p>
               )}
               <div style={{ marginTop: 10 }}>
-                <GmailDraftButton subject={subject} body={body} disabled={acting || !body.trim()} />
+                {selected.draft && isHoldDraft(selected.draft) ? (
+                  <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>
+                ) : (
+                  <GmailDraftButton subject={subject} body={body} disabled={acting || !body.trim()} />
+                )}
               </div>
             </>
           ) : (

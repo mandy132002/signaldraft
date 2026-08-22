@@ -598,6 +598,34 @@ button {
 .badge.pending, .badge.queued {
   color: var(--muted);
 }
+.badge.hold {
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-color: transparent;
+}
+.badge.sensitive {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: transparent;
+}
+
+.callout {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.callout.hold {
+  background: var(--bad-soft);
+  color: var(--ink);
+  border: 1px solid rgba(180, 35, 24, 0.18);
+}
+.callout.sensitive {
+  background: var(--warn-soft);
+  color: var(--ink);
+  border: 1px solid rgba(166, 124, 45, 0.22);
+}
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td {

@@ -1,3 +1,4 @@
+import { isSensitiveHook } from "./edge-cases";
 import {
   analyzeHook,
   applyEntityResolution,
@@ -9,7 +10,7 @@ import {
 } from "./llm";
 import type { LinkedInContext } from "./linkedin";
 import { offerFit } from "./offer";
-import { pickHook, type RankedSignal } from "./relevance";
+import { mentionsCompanyExact, pickHook, type RankedSignal } from "./relevance";
 import type { OutreachDraft, ProspectInput, Signal } from "./types";
 
 export type { HookAnalysis };
@@ -47,6 +48,11 @@ function subjectFromHook(prospect: ProspectInput, hook: Signal): string {
   return `Quick note — ${prospect.company}`;
 }
 
+function isSafeSendableHook(signal: Signal, prospect: ProspectInput): boolean {
+  if (!signal.eligible || signal.kind === "company") return false;
+  return mentionsCompanyExact(`${signal.title} ${signal.summary}`, prospect.company);
+}
+
 /** Merge LLM entity choice with offer-aware ranking. */
 function selectHook(
   signals: Signal[],
@@ -55,7 +61,7 @@ function selectHook(
 ): Signal | undefined {
   const ranked = signals as RankedSignal[];
   const preferred = preferredId
-    ? ranked.find((s) => s.id === preferredId && s.eligible && s.kind !== "company")
+    ? ranked.find((s) => s.id === preferredId && isSafeSendableHook(s, prospect))
     : undefined;
   const best = pickHook(ranked, prospect);
   if (!preferred) return best;
@@ -70,6 +76,26 @@ function selectHook(
   return preferred;
 }
 
+export function noHookDraft(prospect: ProspectInput): OutreachDraft {
+  const sender = prospect.senderName?.trim() || "Alex";
+  return {
+    subject: "HOLD — no confirmed hook",
+    body: `HOLD — do not send.
+
+No public signal could be confirmed as being about ${prospect.fullName} at ${prospect.company}. Better to hold than invent a hook or email a lookalike company.
+
+If you have a source, add a LinkedIn URL or a note and run again.
+
+— ${sender} (internal)`,
+    hook: "No confirmed entity match",
+    confidence: "low",
+    usedSignalIds: [],
+    model: "hold",
+    hold: true,
+    holdReason: `No exact public match for ${prospect.fullName} at ${prospect.company}.`,
+  };
+}
+
 function heuristicDraft(prospect: ProspectInput, hook: Signal, analysis?: HookAnalysis | null): OutreachDraft {
   const sender = prospect.senderName?.trim() || "Alex";
   const senderCo = prospect.senderCompany?.trim() || "";
@@ -78,7 +104,12 @@ function heuristicDraft(prospect: ProspectInput, hook: Signal, analysis?: HookAn
   const name = firstName(prospect.fullName);
   const bit = shortHook(hook.title, 100);
 
-  const sentiment = analysis?.sentiment ?? "neutral";
+  const sensitive = Boolean(hook.sensitive) || isSensitiveHook(hook.title, hook.summary);
+  const sentiment = sensitive
+    ? analysis?.sentiment === "negative"
+      ? "negative"
+      : "mixed"
+    : analysis?.sentiment ?? "neutral";
   const lead =
     sentiment === "negative" || sentiment === "mixed"
       ? `Hi ${name},\n\nSaw the recent coverage on ${prospect.company} ("${bit}") — ${analysis?.businessImpact || "wanted to be thoughtful about timing"}.`
@@ -103,13 +134,16 @@ Open to a 15-minute chat this week?
 
 ${fromLine}`;
 
+  const baseConfidence = hook.relevance >= 0.75 ? "high" : hook.relevance >= 0.55 ? "medium" : "low";
+
   return {
     subject: subjectFromHook(prospect, hook),
     body,
     hook: hook.title,
-    confidence: hook.relevance >= 0.75 ? "high" : hook.relevance >= 0.55 ? "medium" : "low",
+    confidence: sensitive && baseConfidence === "high" ? "medium" : baseConfidence,
     usedSignalIds: [hook.id],
     model: analysis ? "heuristic+analysis" : "heuristic-grounded",
+    sensitiveHook: sensitive,
   };
 }
 
@@ -198,19 +232,7 @@ export async function writeDraft(
 ): Promise<OutreachDraft> {
   const hook = pickHook(ranked as RankedSignal[], prospect);
   if (!hook) {
-    const sender = prospect.senderName?.trim() || "Alex";
-    return {
-      subject: `${prospect.company}`,
-      body: `Hi ${firstName(prospect.fullName)},
-
-I looked for a public signal I could confidently tie to you at ${prospect.company}, and didn't find one solid enough to cite. Better to hold than send a generic note.
-
-${sender}`,
-      hook: "No confirmed entity match",
-      confidence: "low",
-      usedSignalIds: [],
-      model: "heuristic-grounded",
-    };
+    return noHookDraft(prospect);
   }
 
   if (analysis && (await llmAvailable())) {

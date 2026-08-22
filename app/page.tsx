@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
+import type { StageEvent } from "@/lib/types";
 import { ClaudeSpark } from "./ClaudeSpark";
 import { GmailDraftButton } from "./GmailDraftButton";
 import { useLiveSession } from "./LiveSession";
 import { Shell } from "./shell";
-import type { StageEvent } from "@/lib/types";
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
@@ -209,6 +210,9 @@ export default function HomePage() {
   const liveLabel = useMemo(() => {
     if (!ready) return "Restoring last session…";
     if (busy) return "Researching live…";
+    if (run?.draft && isHoldDraft(run.draft)) return "Hold — no confirmed hook to send";
+    if (run?.status === "needs_review" && (run.draft?.sensitiveHook || (run.chosenSignal && signalIsSensitive(run.chosenSignal))))
+      return "Draft ready — sensitive hook, review carefully";
     if (run?.status === "needs_review") return "Outreach draft ready — review before you send";
     if (run?.status === "approved") return "Approved — ready for you to send from your mailbox";
     if (run?.status === "rejected") return "Rejected — will not use this draft";
@@ -402,6 +406,7 @@ export default function HomePage() {
                           {sig.kind} · {sig.source}
                           {sig.matchTier ? ` · ${sig.matchTier}` : ""}
                           {sig.eligible ? " · kept" : " · out"}
+                          {sig.sensitive || signalIsSensitive(sig) ? " · sensitive" : ""}
                         </span>
                         <span>{Math.round(sig.relevance * 100)}</span>
                       </div>
@@ -461,17 +466,39 @@ export default function HomePage() {
           {run?.draft || subject || body ? (
             <div className="card">
               <h2>
-                Outreach email{" "}
+                {run?.draft && isHoldDraft(run.draft) ? "Hold note " : "Outreach email "}
                 {run ? <span className={`badge ${run.status}`}>{run.status.replace("_", " ")}</span> : null}
+                {run?.draft && isHoldDraft(run.draft) ? (
+                  <span className="badge hold" style={{ marginLeft: 6 }}>
+                    do not send
+                  </span>
+                ) : null}
+                {run?.draft?.sensitiveHook || (run?.chosenSignal && signalIsSensitive(run.chosenSignal)) ? (
+                  <span className="badge sensitive" style={{ marginLeft: 6 }}>
+                    sensitive
+                  </span>
+                ) : null}
                 {refining ? (
                   <span style={{ marginLeft: 8, verticalAlign: "middle" }}>
                     <ClaudeSpark size={16} />
                   </span>
                 ) : null}
               </h2>
+              {run?.draft && isHoldDraft(run.draft) ? (
+                <div className="callout hold">
+                  <strong>No confirmed public hook</strong> for {run.prospect.fullName} at {run.prospect.company}.
+                  This is an internal hold, not an email. Add a LinkedIn URL or a source note and run again — do not
+                  send this text.
+                </div>
+              ) : run?.draft?.sensitiveHook || (run?.chosenSignal && signalIsSensitive(run.chosenSignal)) ? (
+                <div className="callout sensitive">
+                  <strong>Sensitive public event.</strong> Do not congratulate or treat this as a win. Review tone
+                  before you copy it to your mailbox.
+                </div>
+              ) : null}
               <label>Subject</label>
               <input value={subject} onChange={(e) => setSubject(e.target.value)} disabled={refining} />
-              <label>Body (edit before you send)</label>
+              <label>{run?.draft && isHoldDraft(run.draft) ? "Internal note" : "Body (edit before you send)"}</label>
               <textarea
                 className="draft"
                 value={body}
@@ -486,7 +513,7 @@ export default function HomePage() {
                 disabled={refining}
               />
 
-              {run?.chosenSignal ? (
+              {run?.chosenSignal && !(run.draft && isHoldDraft(run.draft)) ? (
                 <div className="refine-box">
                   {!showRefine ? (
                     <button
@@ -560,7 +587,7 @@ export default function HomePage() {
                       disabled={refining}
                       onClick={() => void review("approved")}
                     >
-                      Approve & store
+                      {run.draft && isHoldDraft(run.draft) ? "Store hold (do not send)" : "Approve & store"}
                     </button>
                     <button
                       className="btn bad"
@@ -571,11 +598,15 @@ export default function HomePage() {
                       Reject & store
                     </button>
                   </div>
-                  <div style={{ marginTop: 10 }}>
-                    <GmailDraftButton subject={subject} body={body} disabled={refining || !body.trim()} />
-                  </div>
+                  {run.draft && isHoldDraft(run.draft) ? (
+                    <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>
+                  ) : (
+                    <div style={{ marginTop: 10 }}>
+                      <GmailDraftButton subject={subject} body={body} disabled={refining || !body.trim()} />
+                    </div>
+                  )}
                   <p className="hint">
-                    Approving or rejecting saves this email (with your edits) to the dashboard.{" "}
+                    Approving or rejecting saves this result (with your edits) to the dashboard.{" "}
                     <a
                       href={`/history?run=${run.id}`}
                       style={{ color: "var(--copper-2)", textDecoration: "underline" }}

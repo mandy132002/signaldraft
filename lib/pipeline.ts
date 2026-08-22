@@ -193,8 +193,16 @@ export async function executeRun(
     );
     onUpdate(run);
     run.draft = await writeDraft(prospect, signals, analysis, linkedIn);
-    setStage(run, "draft", "done", `Ready for review · ${run.draft.confidence} · ${run.draft.model}`);
-    setStage(run, "review", "done", "Draft held. Edit if needed, then approve — nothing is auto-sent.");
+    if (run.draft.hold) {
+      setStage(run, "draft", "done", `HOLD — no confirmed hook · ${run.draft.holdReason || "do not send"}`);
+      setStage(run, "review", "done", "No sendable email. Store the hold or add a LinkedIn URL and run again.");
+    } else if (run.draft.sensitiveHook) {
+      setStage(run, "draft", "done", `Ready for careful review · sensitive hook · ${run.draft.confidence}`);
+      setStage(run, "review", "done", "Sensitive public event. Do not congratulate. Nothing is auto-sent.");
+    } else {
+      setStage(run, "draft", "done", `Ready for review · ${run.draft.confidence} · ${run.draft.model}`);
+      setStage(run, "review", "done", "Draft held. Edit if needed, then approve — nothing is auto-sent.");
+    }
     run.status = "needs_review";
     run.updatedAt = now();
     await upsertRun(run);

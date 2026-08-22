@@ -1,4 +1,5 @@
 import type { ProspectInput, Signal, SignalKind } from "./types";
+import { isSensitiveHook } from "./edge-cases";
 import { offerFit } from "./offer";
 
 const DAY = 1000 * 60 * 60 * 24;
@@ -165,9 +166,23 @@ export function mentionsPerson(text: string, fullName: string): boolean {
   if (parts.length >= 2) {
     const first = parts[0]!;
     const last = parts[parts.length - 1]!;
-    if (first.length >= 2 && last.length >= 3 && wordMatch(text, first) && wordMatch(text, last)) return true;
+    if (first.length >= 2 && last.length >= 3) {
+      const near = new RegExp(
+        `(${escapeRe(first)}[\\s\\S]{0,40}${escapeRe(last)})|(${escapeRe(last)}[,\\s]{0,24}${escapeRe(first)})`,
+        "i"
+      );
+      if (near.test(text)) return true;
+    }
   }
   return false;
+}
+
+/**
+ * Person is named but the target company is not — unsafe as a sendable hook
+ * (e.g. Jeff Bezos / Blue Origin news while researching Amazon).
+ */
+export function isPersonCompanySplit(text: string, prospect: ProspectInput): boolean {
+  return mentionsPerson(text, prospect.fullName) && !mentionsCompanyExact(text, prospect.company);
 }
 
 /**
@@ -330,6 +345,7 @@ function evaluate(raw: Signal, prospect: ProspectInput, notes: string): RankedSi
   const reasons: string[] = [];
   let score = 0.18;
   let matchTier: RankedSignal["matchTier"] = "soft";
+  const sensitive = isSensitiveHook(raw.title, raw.summary);
 
   if (hasExactCompany) {
     score += 0.16;
@@ -354,6 +370,9 @@ function evaluate(raw: Signal, prospect: ProspectInput, notes: string): RankedSi
   if (personCompanyLinked(text, prospect)) {
     score += 0.12;
     reasons.push("person + company together");
+  } else if (hasPerson && !hasExactCompany) {
+    score -= 0.1;
+    reasons.push("person named without target company (possible other employer)");
   }
 
   if (startsWithCompany(raw.title, prospect.company)) {
@@ -409,12 +428,18 @@ function evaluate(raw: Signal, prospect: ProspectInput, notes: string): RankedSi
     reasons.push("overlaps SDR notes");
   }
 
+  if (sensitive) {
+    score -= 0.06;
+    reasons.push("sensitive event — do not congratulate");
+  }
+
   // Prefer keeping offer-aligned soft matches in the LLM pool
   const eligible = score >= 0.28 || hasExactCompany || hasPerson || pitch.points >= 0.14;
   return {
     ...raw,
     eligible,
     matchTier,
+    sensitive,
     relevance: Math.min(0.99, Number(Math.max(0, score).toFixed(2))),
     why: eligible ? `Candidate (${matchTier}): ${reasons.join("; ")}.` : `Too weak: ${reasons.join("; ")}.`,
   };
@@ -509,12 +534,24 @@ export function isSoftCandidate(
 
 /**
  * Prefer hooks that are (1) about this person+company, (2) relevant to what we sell, (3) high score.
+ * Never pick a lookalike or person-only-other-employer item as the sendable hook.
  */
 export function pickHook(ranked: RankedSignal[], prospect?: ProspectInput): RankedSignal | undefined {
   const eligible = ranked.filter((s) => s.eligible && s.kind !== "company");
   if (!eligible.length) return undefined;
 
-  const scored = eligible.map((s) => {
+  const companyTied = prospect
+    ? eligible.filter((s) => mentionsCompanyExact(`${s.title} ${s.summary}`, prospect.company))
+    : eligible;
+
+  // Edge cases 1+2: lookalikes and person/org-split items cannot be the primary hook.
+  const pool = companyTied.length ? companyTied : [];
+  if (!pool.length) return undefined;
+
+  const nonSensitive = pool.filter((s) => !s.sensitive && !isSensitiveHook(s.title, s.summary));
+  const hookPool = nonSensitive.length ? nonSensitive : pool;
+
+  const scored = hookPool.map((s) => {
     let score = s.relevance;
     if (prospect) {
       const text = `${s.title} ${s.summary}`;
@@ -524,10 +561,10 @@ export function pickHook(ranked: RankedSignal[], prospect?: ProspectInput): Rank
       }
       const pitch = offerFit(text, prospect.senderOffer);
       score += pitch.points;
-      // Prefer exact company matches over soft lookalikes when pitching
       if (s.matchTier === "exact") score += 0.06;
       if (s.matchTier === "person") score += 0.05;
       if (s.matchTier === "suspect") score -= 0.08;
+      if (s.sensitive) score -= 0.12;
     }
     return { s, score };
   });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { holdDraftBodyLooksInternal, isHoldDraft } from "@/lib/edge-cases";
 import { createGmailDraft } from "@/lib/gmail";
 import { requireUserId } from "@/lib/session";
 
@@ -19,6 +20,15 @@ export async function POST(req: NextRequest) {
   const emailBody = (body.emailBody || "").trim();
   if (!emailBody) {
     return NextResponse.json({ error: "Email body is required" }, { status: 400 });
+  }
+  if (
+    holdDraftBodyLooksInternal(emailBody) ||
+    isHoldDraft({ subject, hook: "", usedSignalIds: [], hold: false })
+  ) {
+    return NextResponse.json(
+      { error: "This is a hold note, not an outreach email. Do not save it to Gmail." },
+      { status: 400 }
+    );
   }
 
   // Prefer tokens from the latest OAuth consent (JWT). Auth.js does not

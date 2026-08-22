@@ -163,11 +163,16 @@ export async function hnMentions(
   offer?: string
 ): Promise<Signal[]> {
   const phrase = exactCompanyPhrase(company);
-  const token = distinctiveCompanyTokens(company)[0] || phrase;
+  const tokens = distinctiveCompanyTokens(company);
   const since = Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 540;
-  const queries = [token];
+  // Quoted full name first. Never search a lone first token of a multi-word company
+  // ("cube" for Cube Global → Cube Logic / CUBE collisions).
+  const queries = [phrase];
+  if (tokens.length === 1 && tokens[0] && tokens[0].toLowerCase() !== phrase.toLowerCase()) {
+    queries.push(tokens[0]);
+  }
   const offerTok = offerKeywords(offer)[0];
-  if (offerTok) queries.push(`${token} ${offerTok}`);
+  if (offerTok) queries.push(`${phrase} ${offerTok}`);
 
   const out: Signal[] = [];
   for (const q of queries) {

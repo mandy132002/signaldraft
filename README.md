@@ -138,6 +138,17 @@ Click **Deploy**. After it finishes, open the Vercel URL, sign in with Google, r
 | **Draft** | LLM writes a short sendable email |
 | Review | Approve / reject — **nothing is auto-sent** |
 
+## Edge cases
+
+The pipeline prefers a **hold** over a wrong or invented email. Details: [docs/EDGE_CASES.md](docs/EDGE_CASES.md).
+
+| Case | Example | Outcome |
+| --- | --- | --- |
+| Lookalike company | Cube Global vs CUBE / Cube Logic | Dropped — exact phrase required |
+| Person at another org | Bezos / Amazon vs Blue Origin news | Not used as the hook |
+| No public hook | Low-coverage company | Internal hold — Gmail disabled |
+| Sensitive news | Layoffs, lawsuit, death, breach | Safer hook if one exists; else caution draft |
+
 ## Demo
 
 1. Sign in with Google.

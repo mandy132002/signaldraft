@@ -26,7 +26,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const hook = run.chosenSignal;
-  if (!hook) {
+  if (!hook || run.draft?.hold) {
     return NextResponse.json({ error: "No confirmed hook to refine against" }, { status: 400 });
   }
 

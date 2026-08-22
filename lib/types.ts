@@ -23,6 +23,8 @@ export type Signal = {
   eligible?: boolean;
   /** How the name matched before LLM entity check */
   matchTier?: "exact" | "soft" | "person" | "suspect" | "context";
+  /** Layoff / lawsuit / death / similar — never congratulate */
+  sensitive?: boolean;
 };
 
 export type StageEvent = {
@@ -55,6 +57,11 @@ export type OutreachDraft = {
   confidence: "high" | "medium" | "low";
   usedSignalIds: string[];
   model: string;
+  /** True when there is no confirmed person+company hook — not a sendable email */
+  hold?: boolean;
+  holdReason?: string;
+  /** Chosen hook is a sensitive public event */
+  sensitiveHook?: boolean;
 };
 
 export type HookAnalysis = {

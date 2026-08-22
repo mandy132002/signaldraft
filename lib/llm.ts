@@ -1,5 +1,6 @@
 import type { LinkedInContext } from "./linkedin";
-import { mentionsCompanyExact, mentionsPerson, looksLikeWrongCompany, exactCompanyPhrase } from "./relevance";
+import { isSensitiveHook } from "./edge-cases";
+import { mentionsCompanyExact, exactCompanyPhrase } from "./relevance";
 import type { OutreachDraft, ProspectInput, Signal } from "./types";
 
 export type HookAnalysis = {
@@ -185,6 +186,10 @@ CRITICAL — multi-word company names:
 Use LinkedIn vanity/headline when provided to confirm the person identity.
 When unsure, REJECT.
 
+PERSON vs COMPANY:
+- A story about the person at a DIFFERENT employer (Jeff Bezos / Blue Origin while the target is Amazon) is a REJECT for outreach to the target company.
+- Person-only items that never name the target company are REJECT.
+
 HOOK CHOICE — you are helping an SDR sell: "${prospect.senderOffer?.trim() || "their product"}"
 - chosenHookId must be a confirmed match AND the best bridge to that offer (themes, pain, timing).
 - Prefer hooks where the news implies a need related to the offer over unrelated celebrity/PR fluff.
@@ -277,7 +282,6 @@ export function applyEntityResolution(
 ): Signal[] {
   const matched = new Set(resolution.matchedIds);
   const rejectMap = new Map(resolution.rejected.map((r) => [r.id, r.reason]));
-  const multiWord = exactCompanyPhrase(prospect.company).split(/\s+/).length >= 2;
 
   return signals.map((s) => {
     if (s.kind === "company") {
@@ -295,23 +299,15 @@ export function applyEntityResolution(
 
     const text = `${s.title} ${s.summary}`;
     const hasExact = mentionsCompanyExact(text, prospect.company);
-    const hasPerson = mentionsPerson(text, prospect.fullName);
-    const collision = looksLikeWrongCompany(text, prospect.company);
+    const phrase = exactCompanyPhrase(prospect.company);
 
-    // Safety net: multi-word targets need exact phrase or person; block token-only lookalikes
-    if (multiWord && matched.has(s.id) && !hasExact && !hasPerson) {
+    // Edge cases 1+2: a sendable hook must name this exact company.
+    // Person-only (other employer) and token lookalikes stay out of the draft.
+    if (matched.has(s.id) && !hasExact) {
       return {
         ...s,
         eligible: false,
-        why: `Safety net: LLM kept this, but it lacks exact "${exactCompanyPhrase(prospect.company)}" or the prospect's name (likely lookalike).`,
-        relevance: Math.min(s.relevance, 0.15),
-      };
-    }
-    if (multiWord && matched.has(s.id) && collision && !hasExact) {
-      return {
-        ...s,
-        eligible: false,
-        why: `Safety net: name collision with "${exactCompanyPhrase(prospect.company)}" without exact phrase.`,
+        why: `Safety net: missing exact "${phrase}" — lookalike or person/other-employer, not a sendable hook.`,
         relevance: Math.min(s.relevance, 0.15),
       };
     }
@@ -385,7 +381,7 @@ Return JSON:
       ? (sentimentRaw as HookAnalysis["sentiment"])
       : "neutral";
 
-  return {
+  const result: HookAnalysis = {
     sentiment,
     sentimentWhy: String(obj.sentimentWhy || "").slice(0, 400),
     businessImpact: String(obj.businessImpact || "").slice(0, 500),
@@ -395,6 +391,18 @@ Return JSON:
       ? obj.riskFlags.map((x) => String(x).slice(0, 120)).slice(0, 5)
       : [],
   };
+
+  if (isSensitiveHook(hook.title, hook.summary)) {
+    const flags = new Set(result.riskFlags);
+    flags.add("Sensitive public event — do not congratulate or treat as a win");
+    result.sentiment = result.sentiment === "positive" ? "mixed" : result.sentiment;
+    result.toneGuidance = result.toneGuidance
+      ? `${result.toneGuidance} Stay sober; do not congratulate.`
+      : "Sober and brief. Do not congratulate.";
+    result.riskFlags = [...flags].slice(0, 6);
+  }
+
+  return result;
 }
 
 function escapeReg(s: string) {
@@ -648,7 +656,7 @@ More rules:
 - subject: ≤6 words, natural, about ${prospect.company} — not a news headline dump
 - body ≤90 words (greeting + signature still required)
 - ALWAYS start with "Hi ${first}," and ALWAYS end with the signature above
-- If sentiment is negative/mixed: do not congratulate
+- If sentiment is negative/mixed OR the hook is a layoff/lawsuit/death/investigation: do not congratulate, do not treat it as a win, keep the note brief and respectful
 - No emojis; no "I came across your profile"; no "hope this finds you well"
 - FORBIDDEN opening: anything about Amazon's "growth pillar" unless the prospect company is Amazon and the hook is about that
 
@@ -702,16 +710,20 @@ Return JSON only: {"subject":"...","body":"..."}`;
     }
   }
 
+  const sensitive = Boolean(hook.sensitive) || isSensitiveHook(hook.title, hook.summary);
+  const baseConfidence = hook.relevance >= 0.75 ? "high" : hook.relevance >= 0.55 ? "medium" : "low";
+
   return {
     subject: parsed.subject,
     body: parsed.body,
     hook: hook.title,
-    confidence: hook.relevance >= 0.75 ? "high" : hook.relevance >= 0.55 ? "medium" : "low",
+    confidence: sensitive && baseConfidence === "high" ? "medium" : baseConfidence,
     usedSignalIds: [
       hook.id,
       ...ranked.filter((s) => s.eligible && s.id !== hook.id).slice(0, 2).map((s) => s.id),
     ],
     model: llmModelTag(),
+    sensitiveHook: sensitive,
   };
 }
 

@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
+import type { RunRecord } from "@/lib/types";
 import { Shell } from "../shell";
 import { GmailDraftButton } from "../GmailDraftButton";
 import { useLiveSession } from "../LiveSession";
-import type { RunRecord } from "@/lib/types";
 
 function formatDuration(ms?: number) {
   if (ms == null) return "—";
@@ -274,12 +275,24 @@ export default function HistoryClient() {
             </p>
           ) : (
             <>
+              {isHoldDraft(selected.draft) ? (
+                <div className="callout hold">
+                  <strong>Hold — do not send.</strong> No confirmed public hook for {selected.prospect.fullName} at{" "}
+                  {selected.prospect.company}.
+                </div>
+              ) : selected.draft.sensitiveHook ||
+                (selected.chosenSignal && signalIsSensitive(selected.chosenSignal)) ? (
+                <div className="callout sensitive">
+                  <strong>Sensitive public event.</strong> Review tone before you copy this to your mailbox.
+                </div>
+              ) : null}
               <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--muted)" }}>
                 To {selected.prospect.fullName} · {selected.prospect.company}
                 <br />
                 Hook: {selected.draft.hook}
                 <br />
                 {selected.draft.model} · {selected.draft.confidence}
+                {selected.draft.hold ? " · hold" : ""}
                 {selected.reviewNote ? ` · note: ${selected.reviewNote}` : ""}
                 <br />
                 {selected.status === "approved" || selected.status === "rejected"
@@ -295,7 +308,7 @@ export default function HistoryClient() {
               {selected.status === "needs_review" ? (
                 <div className="actions">
                   <button className="btn ok" type="button" disabled={saving} onClick={() => void decide("approved")}>
-                    Approve & store
+                    {isHoldDraft(selected.draft) ? "Store hold (do not send)" : "Approve & store"}
                   </button>
                   <button className="btn bad" type="button" disabled={saving} onClick={() => void decide("rejected")}>
                     Reject & store
@@ -317,7 +330,11 @@ export default function HistoryClient() {
                 </button>
               </div>
               <div style={{ marginTop: 10 }}>
-                <GmailDraftButton subject={editSubject} body={editBody} disabled={!editBody.trim()} />
+                {isHoldDraft(selected.draft) ? (
+                  <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>
+                ) : (
+                  <GmailDraftButton subject={editSubject} body={editBody} disabled={!editBody.trim()} />
+                )}
               </div>
               {selected.analysis ? (
                 <p className="hint">
