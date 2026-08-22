@@ -71,7 +71,7 @@ ollama pull llama3.2:3b
 
 1. Create an account at [https://console.groq.com](https://console.groq.com)
 2. **API Keys** → create a key
-3. Set `GROQ_API_KEY=...` (default model: `llama-3.1-8b-instant`)
+3. Set `GROQ_API_KEY=...` (default model: `openai/gpt-oss-20b`)
 
 If `GROQ_API_KEY` is present, the app uses Groq. Otherwise it uses Ollama.
 
@@ -111,7 +111,7 @@ Collections created automatically in MongoDB: Auth.js (`users`, `accounts`, `ses
 | `MONGODB_URI` | Atlas URI |
 | `MONGODB_DB` | `signaldraft` |
 | `GROQ_API_KEY` | from Groq |
-| `GROQ_MODEL` | `llama-3.1-8b-instant` (optional) |
+| `GROQ_MODEL` | `openai/gpt-oss-20b` (optional) |
 | `LLM_PROVIDER` | `groq` (optional but clear) |
 
 Do **not** set `OLLAMA_HOST` on Vercel.

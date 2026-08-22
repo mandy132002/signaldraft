@@ -19,7 +19,14 @@ export type EntityResolution = {
 };
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim() || "";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+/** llama-3.1-8b-instant was retired on Groq 2026-08-16 → use gpt-oss-20b */
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+const GROQ_MODEL_FALLBACKS = [
+  GROQ_MODEL,
+  "openai/gpt-oss-20b",
+  "llama-3.3-70b-versatile",
+  "qwen/qwen3-32b",
+].filter((m, i, a) => a.indexOf(m) === i);
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
 const OLLAMA_HOST = (process.env.OLLAMA_HOST || "http://127.0.0.1:11434").replace(/\/$/, "");
 
@@ -68,34 +75,50 @@ export async function ollamaAvailable(): Promise<boolean> {
   return ollamaUp();
 }
 
+async function groqChatOnce(
+  model: string,
+  system: string,
+  user: string,
+  temperature: number
+): Promise<{ content: string | null; retryable: boolean }> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature,
+      max_tokens: 900,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const modelGone = /model_not_found|does not exist|decommissioned/i.test(text);
+    console.error(`Groq error (${model})`, res.status, text);
+    return { content: null, retryable: modelGone };
+  }
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  return { content: json.choices?.[0]?.message?.content ?? null, retryable: false };
+}
+
 async function groqChat(system: string, user: string, temperature = 0.3): Promise<string | null> {
   if (!GROQ_API_KEY) return null;
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature,
-        max_tokens: 900,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      console.error("Groq error", res.status, await res.text());
-      return null;
+    for (const model of GROQ_MODEL_FALLBACKS) {
+      const { content, retryable } = await groqChatOnce(model, system, user, temperature);
+      if (content) return content;
+      if (!retryable) break;
     }
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    return json.choices?.[0]?.message?.content ?? null;
+    return null;
   } catch (e) {
     console.error("Groq unreachable", e);
     return null;
@@ -135,16 +158,24 @@ async function ollamaChatRaw(system: string, user: string, temperature = 0.3): P
   }
 }
 
-/** Chat with Groq (Vercel) or Ollama (local). Always asks for JSON. */
+/** Chat with Groq (cloud) or Ollama (local). Always asks for JSON. */
 async function ollamaChat(system: string, user: string, temperature = 0.3): Promise<string | null> {
   const pref = preferredProvider();
-  if (pref === "groq") return groqChat(system, user, temperature);
-  if (pref === "ollama") return ollamaChatRaw(system, user, temperature);
-  if (GROQ_API_KEY) {
+
+  // Groq first when key is present (auto) or forced
+  if (GROQ_API_KEY && (pref === "groq" || pref === "auto")) {
     const out = await groqChat(system, user, temperature);
     if (out) return out;
+    if (pref === "groq") return null;
   }
-  return ollamaChatRaw(system, user, temperature);
+
+  // Ollama when forced, or auto fallback when Groq unavailable / failed
+  if (pref === "ollama" || pref === "auto") {
+    if (!(await ollamaUp())) return null;
+    return ollamaChatRaw(system, user, temperature);
+  }
+
+  return null;
 }
 
 function extractJsonObject(text: string): Record<string, unknown> | null {
