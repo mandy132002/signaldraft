@@ -1,7 +1,8 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "./mongodb";
+import { GMAIL_SCOPE, hasGmailScope } from "./gmail-scope";
 
-export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.compose";
+export { GMAIL_SCOPE, hasGmailScope };
 
 export type GoogleTokenBundle = {
   access_token?: string | null;
@@ -14,12 +15,6 @@ type GoogleAccount = GoogleTokenBundle & {
   userId: unknown;
   provider?: string;
 };
-
-export function hasGmailScope(scope: string | null | undefined) {
-  if (!scope) return false;
-  const parts = scope.split(/[\s,]+/).filter(Boolean);
-  return parts.includes(GMAIL_SCOPE) || parts.some((p) => p.includes("gmail"));
-}
 
 function userIdClauses(userId: string): Record<string, unknown>[] {
   const clauses: Record<string, unknown>[] = [{ userId }, { userId: String(userId) }];

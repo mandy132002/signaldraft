@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 function isPublicPath(pathname: string) {
   if (pathname === "/login" || pathname.startsWith("/login/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
+  if (pathname === "/api/health") return true;
   return false;
 }
 

@@ -3,7 +3,7 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import Google from "next-auth/providers/google";
 import type { JWT } from "next-auth/jwt";
 import authConfig from "./auth.config";
-import { hasGmailScope, upsertGoogleOAuthTokens } from "./lib/gmail";
+import { hasGmailScope } from "./lib/gmail-scope";
 import getMongoClient from "./lib/mongodb";
 
 function applyGoogleAccountToJwt(token: JWT, account: {
@@ -20,6 +20,7 @@ function applyGoogleAccountToJwt(token: JWT, account: {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  secret: process.env.AUTH_SECRET,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -40,6 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async signIn({ user, account }) {
       if (account?.provider === "google" && user.id) {
+        const { upsertGoogleOAuthTokens } = await import("./lib/gmail");
         await upsertGoogleOAuthTokens(user.id, {
           access_token: account.access_token,
           refresh_token: account.refresh_token,
