@@ -16,6 +16,7 @@ import { Shell } from "../shell";
 import { ClaudeSpark } from "../ClaudeSpark";
 import { GmailDraftButton } from "../GmailDraftButton";
 import { RefineEmailBox } from "../RefineEmailBox";
+import { SignalsCheck } from "../SignalsCheck";
 import { useLiveSession } from "../LiveSession";
 
 function formatDuration(ms?: number) {
@@ -198,7 +199,7 @@ export default function HistoryClient() {
   }
 
   return (
-    <Shell>
+    <Shell wide>
       <div style={{ marginBottom: 24 }}>
         <p
           style={{
@@ -422,7 +423,7 @@ export default function HistoryClient() {
           )}
         </div>
 
-        <div className="card">
+        <div className="card stored-email">
           <h2>
             Stored email {saveMsg ? <span className="badge needs_review">{saveMsg}</span> : null}
           </h2>
@@ -470,6 +471,13 @@ export default function HistoryClient() {
                     ? "Needs review — approve or reject to store"
                     : selected.status}
               </p>
+              <SignalsCheck
+                key={selected.id}
+                signals={selected.signals ?? []}
+                chosenId={selected.chosenSignal?.id}
+                entityNote={selected.entityNote}
+                variant="embedded"
+              />
               <label>Subject</label>
               <input
                 value={editSubject}

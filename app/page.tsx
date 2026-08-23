@@ -6,6 +6,7 @@ import type { StageEvent } from "@/lib/types";
 import { ClaudeSpark } from "./ClaudeSpark";
 import { GmailDraftButton } from "./GmailDraftButton";
 import { RefineEmailBox } from "./RefineEmailBox";
+import { SignalsCheck } from "./SignalsCheck";
 import { useLiveSession } from "./LiveSession";
 import { Shell } from "./shell";
 
@@ -74,7 +75,6 @@ export default function HomePage() {
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [refining, setRefining] = useState(false);
-  const [signalsOpen, setSignalsOpen] = useState(false);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -103,7 +103,6 @@ export default function HomePage() {
   async function startRun() {
     setBusy(true);
     setRun(null);
-    setSignalsOpen(false);
     setSubject("");
     setBody("");
     const started = Date.now();
@@ -357,58 +356,7 @@ export default function HomePage() {
           </div>
 
           {run?.signals?.length ? (
-            <div className="card" style={{ marginBottom: 16 }}>
-              <button
-                type="button"
-                className="collapse-toggle"
-                onClick={() => setSignalsOpen((o) => !o)}
-                aria-expanded={signalsOpen}
-              >
-                <h2 style={{ margin: 0 }}>
-                  Signals found{" "}
-                  <span className="badge" style={{ textTransform: "none", letterSpacing: 0 }}>
-                    {run.signals.length}
-                  </span>
-                </h2>
-                <span className="collapse-chevron">{signalsOpen ? "Hide" : "Show"}</span>
-              </button>
-              {signalsOpen ? (
-                <div className="signals" style={{ marginTop: 14 }}>
-                  {run.signals.slice(0, 8).map((sig) => (
-                    <article className={`signal ${sig.id === chosenId ? "chosen" : ""}`} key={sig.id}>
-                      <div className="signal-meta">
-                        <span className="kind">
-                          {sig.kind} · {sig.source}
-                          {sig.matchTier ? ` · ${sig.matchTier}` : ""}
-                          {sig.eligible ? " · kept" : " · out"}
-                          {sig.sensitive || signalIsSensitive(sig) ? " · sensitive" : ""}
-                        </span>
-                        <span>{Math.round(sig.relevance * 100)}</span>
-                      </div>
-                      <h3>{sig.title}</h3>
-                      <p>{sig.summary}</p>
-                      {sig.why ? <p style={{ marginTop: 6 }}>{sig.why}</p> : null}
-                      {sig.url ? (
-                        <p style={{ marginTop: 6 }}>
-                          <a href={sig.url} target="_blank" rel="noreferrer">
-                            Source
-                          </a>
-                          {sig.id === chosenId ? " · chosen hook" : ""}
-                        </p>
-                      ) : null}
-                    </article>
-                  ))}
-                  {run.signals.length > 8 ? (
-                    <p className="hint">Showing 8 of {run.signals.length}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
-                  {run.signals.filter((s) => s.eligible).length} kept for outreach
-                  {run.chosenSignal ? ` · top hook selected` : ""}
-                </p>
-              )}
-            </div>
+            <SignalsCheck key={run.id} signals={run.signals} chosenId={chosenId} />
           ) : null}
 
           {run?.entityNote ? (

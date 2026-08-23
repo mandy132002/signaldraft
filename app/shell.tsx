@@ -6,10 +6,18 @@ import { AuthMenu } from "./AuthMenu";
 import { BrandMark } from "./BrandMark";
 import { ClaudeSpark } from "./ClaudeSpark";
 
-export function Shell({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
+export function Shell({
+  children,
+  bare = false,
+  wide = false,
+}: {
+  children: React.ReactNode;
+  bare?: boolean;
+  wide?: boolean;
+}) {
   const path = usePathname();
   return (
-    <div className="app-shell">
+    <div className={`app-shell${wide ? " is-wide" : ""}`}>
       <header className="topbar">
         <Link href={bare ? "/login" : "/"} className="brand" aria-label="SignalDraft home">
           <BrandMark size={26} />

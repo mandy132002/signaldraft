@@ -5,7 +5,7 @@ import { ClaudeSpark } from "../ClaudeSpark";
 
 function DashboardFallback() {
   return (
-    <Shell>
+    <Shell wide>
       <div style={{ marginBottom: 24 }}>
         <p
           style={{
