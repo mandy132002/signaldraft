@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { noHookDraft } from "./draft";
 import { isHoldDraft, isSensitiveHook } from "./edge-cases";
-import { capDraftConfidence, parseDraftConfidence } from "./llm";
+import { capDraftConfidence, draftQualityFails, parseDraftConfidence } from "./llm";
 import { applyEntityResolution } from "./llm";
 import {
   isPersonCompanySplit,
@@ -114,6 +114,49 @@ describe("edge case 3 — no confirmed hook", () => {
     assert.match(draft.subject, /^HOLD/);
     assert.match(draft.body, /do not send/i);
     assert.equal(draft.usedSignalIds.length, 0);
+  });
+});
+
+describe("draft quality — direct email to prospect", () => {
+  const colin = {
+    fullName: "Colin Ross",
+    title: "Delivery Manager",
+    company: "Cube",
+    senderName: "Mandar",
+    senderCompany: "BrowserStack",
+    senderOffer: "AI-enabled agentic testing platform",
+  };
+
+  it("rejects third-person Colin bio voice and broken offer lines", () => {
+    const bad = `Hi Colin,
+
+Noticed the Cube news ("Cube: Wrapping Benchmarks Once, Unlocking Agentic AI for Everyone") — The announcement signals Cube is positioning its platform as a foundational layer for agentic AI.
+
+As Delivery Manager, Colin likely oversees delivery of these new capabilities.
+
+Suggest BrowserStack's AI-enabled Agentic testing platform can help Cube automatically verify reliability.
+
+We AI enabled Agentic testing platform.
+
+Open to a 15-minute chat this week?
+
+Mandar
+BrowserStack`;
+    assert.equal(draftQualityFails(bad, colin), true);
+  });
+
+  it("accepts a second-person sendable note", () => {
+    const good = `Hi Colin,
+
+Noticed Cube's update on wrapping benchmarks and unlocking agentic AI — useful timing if your team is shipping those capabilities.
+
+At BrowserStack, we offer an AI-enabled agentic testing platform to help you validate reliability before release.
+
+Open to a 15-minute chat this week?
+
+Mandar
+BrowserStack`;
+    assert.equal(draftQualityFails(good, colin), false);
   });
 });
 

@@ -115,17 +115,28 @@ function heuristicDraft(prospect: ProspectInput, hook: Signal, analysis?: HookAn
     sentiment === "negative" || sentiment === "mixed"
       ? `Hi ${name},\n\nSaw the recent coverage on ${prospect.company} ("${bit}") — ${analysis?.businessImpact || "wanted to be thoughtful about timing"}.`
       : sentiment === "positive"
-        ? `Hi ${name},\n\nNoticed the ${prospect.company} news ("${bit}") — ${analysis?.businessImpact || "looks like a meaningful moment"}.`
+        ? `Hi ${name},\n\nNoticed ${prospect.company}'s recent update ("${bit}") — ${analysis?.businessImpact || "looks like a meaningful moment for your team"}.`
         : `Hi ${name},\n\nRe: ${prospect.company} — "${bit}". ${analysis?.businessImpact || ""}`.trim();
 
-  const angle =
-    analysis?.outreachAngle ||
-    (offer
-      ? `Given that, ${offer} may be relevant for you as ${prospect.title || "a leader"} there.`
-      : `Thought it was worth a short note given your role.`);
+  const angleFromAnalysis = analysis?.outreachAngle?.trim();
+  const angleLooksThirdPerson =
+    !!angleFromAnalysis &&
+    (new RegExp(`\\b${name}\\s+(likely|oversees|manages)\\b`, "i").test(angleFromAnalysis) ||
+      new RegExp(`\\bAs\\s+[^,.]+,\\s*${name}\\b`, "i").test(angleFromAnalysis));
 
+  const angle =
+    angleFromAnalysis && !angleLooksThirdPerson
+      ? angleFromAnalysis
+      : offer
+        ? `At ${senderCo || sender}, we offer ${offer} — worth a look given what your team is shipping.`
+        : `Thought it was worth a short note given your role.`;
+
+  const offerAlreadyInAngle =
+    !!offer && angle.toLowerCase().includes(offer.toLowerCase().slice(0, Math.min(20, offer.length)));
   const offerLine =
-    offer && !angle.toLowerCase().includes(offer.toLowerCase().slice(0, 20)) ? `We ${offer}.` : "";
+    offer && !offerAlreadyInAngle
+      ? `At ${senderCo || sender}, we offer ${offer}.`
+      : "";
 
   const body = `${lead}
 

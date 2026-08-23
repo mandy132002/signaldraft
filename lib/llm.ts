@@ -496,16 +496,17 @@ export async function analyzeHook(
   linkedIn?: LinkedInContext | null
 ): Promise<HookAnalysis | null> {
   const pack = packResearch(prospect, hook, ranked, linkedIn);
-  const system = `You are a B2B sales research analyst for cold outreach.
+  const system = `You are a B2B sales research analyst preparing notes for a cold email TO ${prospect.fullName} (second person: you/your).
 Return ONLY valid JSON.
 Hard rules:
 - Use ONLY facts in the research pack about ${prospect.fullName} / ${prospect.company}.
 - Never invent shared history, past jobs, meetings, or relationships between the sender and the prospect.
 - Never claim the sender worked with/at the prospect's company unless the pack explicitly says so (it will not).
 - Primary hook title/summary is the only news event you may reference.
-- Do not bring in Amazon, Google, or other companies unless they appear in the pack for THIS prospect.`;
+- Do not bring in Amazon, Google, or other companies unless they appear in the pack for THIS prospect.
+- outreachAngle and businessImpact must be usable as copy spoken TO the person — never "Colin likely oversees…" / third-person biography.`;
 
-  const user = `Analyze this research pack for a cold email to ${prospect.fullName} at ${prospect.company} (sender does NOT know the prospect personally).
+  const user = `Analyze this research pack for a cold email written directly TO ${prospect.fullName} (${prospect.title || "leader"} at ${prospect.company}). The sender does NOT know them personally.
 
 RESEARCH PACK:
 ${JSON.stringify(pack, null, 2)}
@@ -518,10 +519,10 @@ Return JSON:
 {
   "sentiment": "positive" | "neutral" | "negative" | "mixed",
   "sentimentWhy": "1 sentence on tone of the primary hook only",
-  "businessImpact": "1-2 sentences: likely implication of THIS hook for ${prospect.company} / role — no invented history",
-  "outreachAngle": "1 sentence: concrete bridge from THIS hook to selling \"${prospect.senderOffer?.trim() || "the offer"}\" — must sound natural for a stranger",
-  "toneGuidance": "tone for a stranger sending cold email (e.g. respectful, pragmatic, not congratulatory if negative)",
-  "riskFlags": ["things to avoid in the email, e.g. fake personal connection, wrong company"]
+  "businessImpact": "1 short sentence: what THIS hook may mean for ${prospect.company} — factual, no invented duties for ${prospect.fullName}",
+  "outreachAngle": "1 sentence in SECOND PERSON (you/your) bridging THIS hook to \"${prospect.senderOffer?.trim() || "the offer"}\" — never use ${(prospect.fullName.trim().split(/\s+/)[0] || "the prospect")}'s name in third person",
+  "toneGuidance": "direct, concise, peer-to-peer stranger cold email; not a dossier about the prospect",
+  "riskFlags": ["e.g. third-person 'Colin likely…', wrong company, inventing their responsibilities, broken grammar"]
 }`;
 
   const raw = await llmChat(system, user, 0.15);
@@ -618,6 +619,50 @@ export function draftLooksHallucinated(body: string, prospect: ProspectInput): b
   if (/\bmy career\b/i.test(firstSentence) || /\bi (?:used to )?work(?:ed)? with\b/i.test(firstSentence)) {
     return true;
   }
+  return false;
+}
+
+/**
+ * Reject drafts that are not a real email TO the prospect:
+ * third-person bio voice, broken offer lines, "Suggest Company…" pitches.
+ */
+export function draftQualityFails(body: string, prospect: ProspectInput): boolean {
+  const parts = prospect.fullName.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0] || "";
+  const last = parts.length > 1 ? parts[parts.length - 1]! : "";
+  const content = body
+    .replace(/^(hi|hello|hey|dear)\s+[^,\n]*,?\s*/i, "")
+    .trim();
+
+  // Talking ABOUT the person instead of TO them
+  if (first.length >= 2) {
+    if (new RegExp(`\\bAs\\s+[^,.\\n]{2,40},\\s*${escapeReg(first)}\\b`, "i").test(content)) return true;
+    if (
+      new RegExp(
+        `\\b${escapeReg(first)}\\s+(likely|probably|oversees|manages|leads|will need|is responsible)\\b`,
+        "i"
+      ).test(content)
+    ) {
+      return true;
+    }
+  }
+  if (last.length >= 3 && first.length >= 2) {
+    if (new RegExp(`\\b${escapeReg(first)}\\s+${escapeReg(last)}\\b`, "i").test(content)) return true;
+  }
+
+  // Broken / non-email pitch patterns from the bad Cube draft
+  if (/^\s*Suggest\b/im.test(content)) return true;
+  if (/\bSuggest\s+[A-Z][A-Za-z0-9&.\s-]{0,40}'s\b/i.test(content)) return true;
+  if (/\bWe\s+AI[- ]?enabled\b/i.test(content)) return true;
+  if (/\bWe\s+[A-Z][a-z]*\s+enabled\b/i.test(content)) return true;
+
+  // Incomplete fragment lines (e.g. "We AI enabled Agentic testing platform.")
+  for (const line of content.split(/\n/).map((l) => l.trim()).filter(Boolean)) {
+    if (/^We\s+[A-Z]/.test(line) && line.split(/\s+/).length <= 8 && !/\b(help|offer|build|provide|work)\b/i.test(line)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -765,80 +810,82 @@ export async function draftEmail(
   const offer = prospect.senderOffer?.trim() || "our product";
   const snippet = hookSnippet(hook, 12);
 
-  const system = `You write cold B2B outreach emails for an SDR who does NOT know the prospect.
+  const system = `You write cold B2B emails that will be sent FROM an SDR TO one named person.
 Return ONLY valid JSON.
-THIS EMAIL IS ONLY ABOUT: ${prospect.fullName} at ${prospect.company}.
-You may name ${prospect.company} and ${senderCo || "the sender's company"}. Do NOT name any other employer or brand unless it appears in the PRIMARY HOOK below.
-REQUIRED IN EVERY BODY (non-negotiable):
-1) First line MUST be exactly: Hi ${first},
-2) Last lines MUST be the signature:
+
+RECIPIENT (the email is written TO this person — use you/your, never third person):
+- Name: ${prospect.fullName}
+- Title: ${prospect.title || "leader"}
+- Company: ${prospect.company}
+
+SENDER:
+- Name: ${sender}${senderCo ? `\n- Company: ${senderCo}` : ""}
+- What they sell (use as a grammatical product description, do not paste broken fragments): ${offer}
+
+REQUIRED BODY SHAPE (real newlines in the JSON string):
+1) First line exactly: Hi ${first},
+2) One short hook sentence in second person about ${prospect.company} + the public hook below
+3) One short sentence connecting that hook to what ${senderCo || sender} sells — second person ("you" / "your team")
+4) One soft ask for a 15-minute chat
+5) Signature exactly:
 ${sender}${senderCo ? `\n${senderCo}` : ""}
-ABSOLUTE PROHIBITIONS:
-- Never invent that the sender worked with, met, knew, or shared history with the prospect.
-- Never invent past employment at the prospect's company.
-- Never write "I worked with {prospect}" or "built my career on…".
-- Never flatter with fake personal anecdotes.
-- Never reuse examples about Amazon, Google, or any other company from training/memory.
-- The sender is a stranger. The ONLY personalization is the public hook about ${prospect.company}.
+
+VOICE RULES (non-negotiable):
+- Write TO ${first}, not ABOUT ${first}. Forbidden: "${first} likely…", "As ${prospect.title || "Delivery Manager"}, ${first}…", dossiers, analyst memos.
+- Never invent ${first}'s responsibilities, org chart, or what they "will need".
+- Never invent personal history with ${first}.
 - Do not invent news facts beyond the primary hook.
-- Never omit the greeting or the signature.`;
+- Do not name other employers/brands unless they appear in the primary hook or are ${prospect.company} / ${senderCo || "the sender company"}.
+- Every sentence must be complete English. Forbidden: "Suggest BrowserStack's…", "We AI enabled…", truncated product lines.
+- If stating the offer, write a full sentence such as "At ${senderCo || sender}, we offer ${offer}." — never "We " + a noun phrase that is not a verb phrase.`;
 
-  const user = `Write a cold email from ${sender}${senderCo ? ` at ${senderCo}` : ""} to ${prospect.fullName} (${prospect.title || "leader"} at ${prospect.company}).
+  const user = `Write the sendable cold email TO ${prospect.fullName} at ${prospect.company}.
 
-PROSPECT COMPANY (only company to cite in the hook sentence): ${prospect.company}
-WHAT WE SELL: ${offer}
-
-PRIMARY PUBLIC HOOK — ground the opening in THIS story only (paraphrase; do not paste the full headline):
+PRIMARY PUBLIC HOOK (paraphrase; do not dump the full headline in quotes unless short):
 Title: ${hook.title}
 Summary: ${hook.summary}
 Kind: ${hook.kind}
 
-ANALYSIS (implication + tone only — still about ${prospect.company}, never invent history):
+ANALYSIS (hints only — rewrite into second-person email copy; discard any third-person "likely oversees" language):
 ${JSON.stringify(analysis, null, 2)}
 
 LinkedIn (identity only): ${linkedIn?.headline || linkedIn?.vanity || prospect.linkedinUrl || "none"}
 
-EXACT STRUCTURE for body (real newlines in the JSON string):
-Hi ${first},
+BAD (never produce this style):
+"Hi Colin,
 
-<ONE sentence starting with Saw/Noticed/Read/Re: that mentions ${prospect.company} and this hook ("${snippet}…"). NEVER mention a different company.>
+Noticed the Cube news ("…") — The announcement signals Cube is positioning…
+As Delivery Manager, Colin likely oversees…
+Suggest BrowserStack's AI-enabled…
+We AI enabled Agentic testing platform.
 
-<ONE sentence: how ${offer} could matter for their role at ${prospect.company} given THAT hook.>
+Mandar
+BrowserStack"
 
-<ONE soft ask for a 15-minute chat.>
-
-${sender}${senderCo ? `\n${senderCo}` : ""}
-
-More rules:
-- subject: ≤6 words, natural, about ${prospect.company} — not a news headline dump
-- body ≤90 words (greeting + signature still required)
-- ALWAYS start with "Hi ${first}," and ALWAYS end with the signature above
-- If sentiment is negative/mixed OR the hook is a layoff/lawsuit/death/investigation: do not congratulate, do not treat it as a win, keep the note brief and respectful
-- No emojis; no "I came across your profile"; no "hope this finds you well"
-- FORBIDDEN opening: anything about Amazon's "growth pillar" unless the prospect company is Amazon and the hook is about that
-
-BAD (forbidden):
-"I worked with Jeff Bezos at Amazon…"
-"Noticed your comments on Amazon's next growth pillar…" (when writing to anyone not at Amazon)
-
-GOOD shape (use ${prospect.company} + THIS hook — do not copy other brands):
+GOOD (match this shape for ${first} / ${prospect.company}):
 "Hi ${first},
 
-Noticed ${prospect.company}'s recent ${hook.kind} coverage around ${snippet} — [one sober implication].
+Noticed ${prospect.company}'s update on ${snippet} — [one sober implication for your team, second person].
 
-[how ${offer} could help in that context.]
+At ${senderCo || sender}, we offer ${offer} — happy to show how that could help you validate reliability as those capabilities roll out.
 
 Open to a 15-minute chat this week?
 
 ${sender}${senderCo ? `\n${senderCo}` : ""}"
 
-Return JSON only:
-{"subject":"...","body":"...","confidence":"high|medium|low","confidenceWhy":"one sentence on how sure you are this email is accurate and sendable"}
+More rules:
+- subject: ≤6 words, natural, about ${prospect.company} (not a pasted headline)
+- body ≤90 words including greeting + signature
+- If sentiment is negative/mixed or the hook is sensitive: do not congratulate
+- No emojis; no "I came across your profile"; no "hope this finds you well"
 
-Confidence rules (be honest — this is shown to the SDR):
-- high: hook clearly names this person or this exact company, facts are in the pack, offer bridge is natural
-- medium: company match is solid but the hook is thin, older, or the offer link is inferred
-- low: you had to hedge, the hook is weak/stale/sensitive, or you are not sure this is the right entity`
+Return JSON only:
+{"subject":"...","body":"...","confidence":"high|medium|low","confidenceWhy":"one sentence on how sure you are this email is accurate and sendable to ${first}"}
+
+Confidence:
+- high: clear company hook + natural second-person offer bridge
+- medium: solid company match but thin hook or inferred bridge
+- low: weak/sensitive hook or unsure entity`
 
   const attempt = async (extra?: string) => {
     const raw = await llmChat(system, extra ? `${user}\n\nFIX PREVIOUS OUTPUT: ${extra}` : user, 0.15);
@@ -855,6 +902,7 @@ Confidence rules (be honest — this is shown to the SDR):
   const needsRewrite = (body: string) =>
     draftLooksHallucinated(body, prospect) ||
     draftCrossContaminated(body, prospect, hook) ||
+    draftQualityFails(body, prospect) ||
     !firstLineCitesHook(body, hook, prospect);
 
   let parsed = await attempt();
@@ -864,12 +912,12 @@ Confidence rules (be honest — this is shown to the SDR):
   if (needsRewrite(parsed.body)) {
     rewritten = true;
     parsed = await attempt(
-      `Wrong company or ignored hook. Rewrite ONLY about ${prospect.fullName} at ${prospect.company}. Opening MUST cite this hook: "${snippet}". Do NOT mention Amazon or any other company unless it is ${prospect.company} or appears in the hook. MUST start with "Hi ${first}," and end with the signature.`
+      `Rewrite as a direct email TO ${first} at ${prospect.company}. Use you/your. Do NOT write "${first} likely…" or "As ${prospect.title || "their title"}, ${first}…". Opening must cite the hook (${snippet}). Offer sentence must be complete English (e.g. "At ${senderCo || sender}, we offer ${offer}."). Start with "Hi ${first}," and end with the signature.`
     );
     if (!parsed) return null;
     if (needsRewrite(parsed.body)) {
       parsed = await attempt(
-        `STRICT: First content sentence must include the word "${prospect.company}" and reference the hook theme. Zero other employer names.`
+        `STRICT second-person only. Forbidden phrases: "Suggest ${senderCo || "our"}", "We AI enabled", "${first} likely", "As Delivery Manager". First content sentence must include "${prospect.company}" and the hook theme.`
       );
       if (!parsed || needsRewrite(parsed.body)) return null;
     }
@@ -916,30 +964,29 @@ export async function refineDraft(input: {
   const instruction = refinePrompt.trim();
   if (!instruction) return null;
 
-  const system = `You refine cold B2B outreach emails for an SDR.
-Return ONLY valid JSON with keys subject and body.
-THIS EMAIL IS ONLY ABOUT: ${prospect.fullName} at ${prospect.company}.
-Do NOT introduce Amazon, Google, or any other employer unless it is ${prospect.company} or appears in the public hook.
-REQUIRED IN EVERY BODY (non-negotiable):
-1) First line MUST be exactly: Hi ${first},
-2) Last lines MUST be the signature:
+  const system = `You refine cold B2B emails written TO ${prospect.fullName} (second person: you/your).
+Return ONLY valid JSON with keys subject, body, confidence, confidenceWhy.
+Do NOT introduce other employers unless they are ${prospect.company} or appear in the public hook.
+REQUIRED:
+1) First line exactly: Hi ${first},
+2) Signature:
 ${sender}${senderCo ? `\n${senderCo}` : ""}
-Keep it a cold email from a stranger — never invent personal history with the prospect.
-Apply the SDR's refinement instructions carefully while staying grounded in the public hook.
-Do not invent news facts beyond the hook.
-Never omit the greeting or the signature.`;
+Write TO ${first}, never ABOUT ${first} in third person ("${first} likely…").
+Keep complete grammatical sentences. Never "Suggest X's…" or "We AI enabled…".
+Never invent personal history. Stay grounded in the public hook.
+Apply the SDR's refinement instructions carefully.`;
 
-  const user = `Refine this outreach email.
+  const user = `Refine this outreach email so it remains a sendable note TO ${prospect.fullName}.
 
 TO: ${prospect.fullName}, ${prospect.title} at ${prospect.company}
 FROM: ${sender}${senderCo ? ` at ${senderCo}` : ""}
-OFFER: ${offer}
+OFFER (use in a full grammatical sentence): ${offer}
 
-PUBLIC HOOK (must still be reflected in the opening — about ${prospect.company}):
+PUBLIC HOOK (opening must still reflect this — about ${prospect.company}):
 ${hook.title}
 ${hook.summary}
 
-ANALYSIS (optional context):
+ANALYSIS (optional; convert any third-person notes into you/your):
 ${analysis ? JSON.stringify(analysis, null, 2) : "none"}
 
 CURRENT EMAIL:
@@ -947,22 +994,17 @@ Subject: ${currentSubject}
 
 ${currentBody}
 
-SDR REFINEMENT INSTRUCTIONS (follow these — this is the priority change request):
+SDR REFINEMENT INSTRUCTIONS (priority):
 ${instruction}
 
 Rules:
 - subject ≤6 words; body ≤90 words; real newlines
-- ALWAYS start body with exactly "Hi ${first},"
-- ALWAYS end body with signature:
-${sender}${senderCo ? `\n${senderCo}` : ""}
-- First content sentence should still reference the public hook AND ${prospect.company}
-- Incorporate the refinement (tone, angle, CTA, length, emphasis, etc.)
-- No fake "I worked with…" / career autobiography
-- No other-company bleed (no Amazon growth pillar unless this prospect is Amazon)
-- No emojis; no "I came across your profile"
+- ALWAYS start with "Hi ${first}," and end with the signature
+- Second person only after the greeting
+- No fake history; no broken product fragments
 
 Return JSON:
-{"subject":"...","body":"...","confidence":"high|medium|low","confidenceWhy":"one sentence on how sure you are this refined email is accurate"}`;
+{"subject":"...","body":"...","confidence":"high|medium|low","confidenceWhy":"one sentence"}`;
 
   const raw = await llmChat(system, user, 0.2);
   if (!raw) return null;
@@ -973,12 +1015,14 @@ Return JSON:
   let body = ensureGreetingAndSignature(String(obj.body).trim().replace(/\\n/g, "\n"), prospect);
 
   const bad = (b: string) =>
-    draftLooksHallucinated(b, prospect) || draftCrossContaminated(b, prospect, hook);
+    draftLooksHallucinated(b, prospect) ||
+    draftCrossContaminated(b, prospect, hook) ||
+    draftQualityFails(b, prospect);
 
   if (bad(body)) {
     const retry = await llmChat(
       system,
-      `${user}\n\nFIX: Remove invented history and any wrong company names. Keep only ${prospect.company} + the public hook. Keep "Hi ${first}," and the signature.`,
+      `${user}\n\nFIX: Second person only (you/your). Remove "${first} likely…", "Suggest…", and broken "We …" fragments. Keep "Hi ${first}," and the signature.`,
       0.15
     );
     if (!retry) return null;
