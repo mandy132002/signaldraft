@@ -499,16 +499,11 @@ export default function HomePage() {
                   </span>
                 ) : null}
               </h2>
-              {run?.draft?.confidenceWhy && !isHoldDraft(run.draft) ? (
-                <p className="hint" style={{ marginTop: 0 }}>
-                  {run.draft.confidenceWhy}
-                </p>
-              ) : null}
               {run?.draft && isHoldDraft(run.draft) ? (
                 <div className="callout hold">
                   <strong>No confirmed public hook</strong> for {run.prospect.fullName} at {run.prospect.company}.
                   This is an internal hold, not an email. Add a LinkedIn URL, company website, or a source note and run
-                  again — do not                  send this text.
+                  again — do not send this text.
                 </div>
               ) : run?.draft?.sensitiveHook || (run?.chosenSignal && signalIsSensitive(run.chosenSignal)) ? (
                 <div className="callout sensitive">

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { Shell } from "../../shell";
 import { ClaudeSpark } from "../../ClaudeSpark";
 import { GmailDraftButton } from "../../GmailDraftButton";
+import { RefineEmailBox } from "../../RefineEmailBox";
 import { bulkElapsedMs, summarizeBulk } from "@/lib/bulk-stats";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { BulkJob, BulkItem, RunRecord } from "@/lib/types";
@@ -52,6 +53,7 @@ export default function BulkJobPage() {
   const [body, setBody] = useState("");
   const [note, setNote] = useState("");
   const [acting, setActing] = useState(false);
+  const [refining, setRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -422,7 +424,6 @@ export default function BulkJobPage() {
                 {selected.prospect.title ? `${selected.prospect.title} · ` : ""}
                 {selected.prospect.company}
                 {selected.chosenSignal ? ` · Hook: ${selected.chosenSignal.title}` : ""}
-                {selected.draft?.confidenceWhy ? ` · ${selected.draft.confidenceWhy}` : ""}
               </p>
               {selected.draft && isHoldDraft(selected.draft) ? (
                 <div className="callout hold">
@@ -438,28 +439,51 @@ export default function BulkJobPage() {
               <input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                disabled={selected.status !== "needs_review" || acting}
+                disabled={selected.status !== "needs_review" || acting || refining}
               />
               <label>Body</label>
               <textarea
                 className="draft"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                disabled={selected.status !== "needs_review" || acting}
+                disabled={selected.status !== "needs_review" || acting || refining}
               />
               <label>Reviewer note</label>
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Optional"
-                disabled={selected.status !== "needs_review" || acting}
+                disabled={selected.status !== "needs_review" || acting || refining}
+              />
+              <RefineEmailBox
+                runId={selected.id}
+                subject={subject}
+                body={body}
+                enabled={Boolean(selected.chosenSignal && !isHoldDraft(selected.draft))}
+                disabled={acting}
+                onRefiningChange={setRefining}
+                onRefined={({ subject: s, body: b, run }) => {
+                  setSubject(s);
+                  setBody(b);
+                  setRuns((prev) => prev.map((r) => (r.id === run.id ? run : r)));
+                }}
               />
               {selected.status === "needs_review" ? (
                 <div className="actions">
-                  <button className="btn ok" type="button" disabled={acting} onClick={() => void decide("approved")}>
+                  <button
+                    className="btn ok"
+                    type="button"
+                    disabled={acting || refining}
+                    onClick={() => void decide("approved")}
+                  >
                     {selected.draft && isHoldDraft(selected.draft) ? "Store hold (do not send)" : "Approve & store"}
                   </button>
-                  <button className="btn bad" type="button" disabled={acting} onClick={() => void decide("rejected")}>
+                  <button
+                    className="btn bad"
+                    type="button"
+                    disabled={acting || refining}
+                    onClick={() => void decide("rejected")}
+                  >
                     Reject & store
                   </button>
                 </div>
@@ -470,7 +494,7 @@ export default function BulkJobPage() {
                 {selected.draft && isHoldDraft(selected.draft) ? (
                   <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>
                 ) : (
-                  <GmailDraftButton subject={subject} body={body} disabled={acting || !body.trim()} />
+                  <GmailDraftButton subject={subject} body={body} disabled={acting || refining || !body.trim()} />
                 )}
               </div>
             </>

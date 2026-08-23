@@ -110,6 +110,12 @@ a { color: inherit; text-decoration: none; }
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  color: var(--ink);
+  transition: opacity 0.2s var(--ease);
+}
+.brand:hover {
+  color: var(--ink);
+  opacity: 0.88;
 }
 .brand span { color: var(--copper); }
 .brand .brand-mark-bg { color: var(--ink); }
@@ -131,12 +137,16 @@ a { color: inherit; text-decoration: none; }
 }
 .nav a:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.85);
 }
 .nav a.active {
   color: var(--ink);
   background: var(--card-solid);
   box-shadow: var(--shadow-sm);
+}
+.nav a.active:hover {
+  color: var(--ink);
+  background: var(--card-solid);
 }
 
 .auth-menu {
@@ -174,12 +184,17 @@ a { color: inherit; text-decoration: none; }
 .auth-chip:hover {
   border-color: var(--line-strong);
   background: #fff;
+  color: var(--ink);
 }
 .auth-chip:active { transform: scale(0.97); }
 .auth-chip.muted {
   border-color: transparent;
   background: transparent;
   color: var(--muted);
+}
+.auth-chip.muted:hover {
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* ——— Login ——— */
@@ -392,37 +407,61 @@ button {
   font-weight: 600;
   border-radius: 999px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, var(--shadow-sm);
-  transition: transform 0.15s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  transition:
+    transform 0.15s var(--ease),
+    background 0.2s var(--ease),
+    color 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
 }
-.btn:hover:not(:disabled) {
+.btn:not(.ghost):not(.ok):not(.bad):hover:not(:disabled) {
   background: #2c2a27;
+  color: #faf7f2;
   box-shadow: var(--shadow-md);
 }
 .btn:active:not(:disabled) { transform: scale(0.985); }
 .btn .claude-spark-arm { fill: #f4a48a; }
-.btn:disabled { opacity: 0.5; cursor: wait; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .btn.ghost {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.55);
   color: var(--ink);
   border: 1px solid var(--line-strong);
   box-shadow: none;
 }
+.btn.ghost:hover:not(:disabled) {
+  background: var(--card-solid);
+  color: var(--ink);
+  border-color: rgba(31, 30, 29, 0.28);
+  box-shadow: var(--shadow-sm);
+}
 .btn.ghost.gmail-draft-btn {
   border-color: rgba(234, 67, 53, 0.28);
   background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
 }
 .btn.ghost.gmail-draft-btn:hover:not(:disabled) {
   background: #fff5f3;
+  color: var(--ink);
   border-color: rgba(234, 67, 53, 0.45);
 }
 .btn.ok {
   background: linear-gradient(180deg, #4a8f6c, var(--ok));
   color: #fff;
 }
+.btn.ok:hover:not(:disabled) {
+  background: linear-gradient(180deg, #428a68, #2f6649);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
 .btn.bad {
   background: linear-gradient(180deg, #c73a2e, var(--bad));
   color: #fff;
+}
+.btn.bad:hover:not(:disabled) {
+  background: linear-gradient(180deg, #b53428, #9a2218);
+  color: #fff;
+  box-shadow: var(--shadow-md);
 }
 
 .actions { display: flex; gap: 10px; }
@@ -527,6 +566,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  color: inherit;
 }
 
 .signals { display: flex; flex-direction: column; gap: 10px; }
@@ -557,7 +597,15 @@ button {
 }
 .signal h3 { margin: 8px 0 4px; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
 .signal p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
-.signal a { color: var(--copper-2); text-decoration: underline; text-underline-offset: 2px; }
+.signal a {
+  color: var(--copper-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s var(--ease);
+}
+.signal a:hover {
+  color: var(--copper);
+}
 
 .draft {
   white-space: pre-wrap;
@@ -664,7 +712,10 @@ th {
   font-weight: 650;
 }
 tr.clickable { cursor: pointer; transition: background 0.15s var(--ease); }
-tr.clickable:hover { background: rgba(255, 255, 255, 0.55); }
+tr.clickable:hover { background: rgba(255, 255, 255, 0.72); color: var(--ink); }
+tr.clickable:hover td { color: var(--ink); }
+tr.clickable:hover td div { color: var(--ink-soft); }
+tr.selected-row:hover { background: var(--copper-soft); }
 
 .kpis {
   display: grid;
@@ -812,6 +863,11 @@ tr.clickable:hover { background: rgba(255, 255, 255, 0.55); }
 .pagination-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  color: var(--muted);
+}
+.pagination-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
 }
 tr.selected-row { background: var(--copper-soft); }
 tr.selected-row td { border-bottom-color: rgba(201, 100, 66, 0.35); }
@@ -897,9 +953,13 @@ tr.selected-row td { border-bottom-color: rgba(201, 100, 66, 0.35); }
   transition: background 0.15s var(--ease);
 }
 .bulk-job-list a:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
 }
 .bulk-job-list a:hover strong { color: var(--copper-2); }
+.bulk-job-list a:hover span {
+  color: var(--ink-soft);
+}
 .bulk-job-list span {
   color: var(--muted);
   font-size: 12.5px;
@@ -971,7 +1031,16 @@ tr.selected-row td { border-bottom-color: rgba(201, 100, 66, 0.35); }
   transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 .bulk-queue-item:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.78);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.bulk-queue-item:hover:not(:disabled) .bulk-q-name small {
+  color: var(--ink-soft);
+}
+.bulk-queue-item.active:hover:not(:disabled) {
+  background: #fff8f3;
+  border-color: rgba(201, 100, 66, 0.45);
 }
 .bulk-queue-item:disabled {
   cursor: default;

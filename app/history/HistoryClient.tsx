@@ -7,6 +7,7 @@ import type { RunRecord } from "@/lib/types";
 import { Shell } from "../shell";
 import { ClaudeSpark } from "../ClaudeSpark";
 import { GmailDraftButton } from "../GmailDraftButton";
+import { RefineEmailBox } from "../RefineEmailBox";
 import { useLiveSession } from "../LiveSession";
 
 function formatDuration(ms?: number) {
@@ -32,6 +33,7 @@ export default function HistoryClient() {
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [refining, setRefining] = useState(false);
 
   async function load(opts?: { initial?: boolean }) {
     try {
@@ -381,12 +383,6 @@ export default function HistoryClient() {
                 </span>
                 {selected.draft.hold ? " · hold" : ""}
                 {selected.reviewNote ? ` · note: ${selected.reviewNote}` : ""}
-                {selected.draft.confidenceWhy ? (
-                  <>
-                    <br />
-                    {selected.draft.confidenceWhy}
-                  </>
-                ) : null}
                 <br />
                 {selected.status === "approved" || selected.status === "rejected"
                   ? `Stored · ${selected.status}`
@@ -395,28 +391,69 @@ export default function HistoryClient() {
                     : selected.status}
               </p>
               <label>Subject</label>
-              <input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} />
+              <input
+                value={editSubject}
+                onChange={(e) => setEditSubject(e.target.value)}
+                disabled={refining}
+              />
               <label>Body</label>
-              <textarea className="draft" value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+              <textarea
+                className="draft"
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                disabled={refining}
+              />
+              <RefineEmailBox
+                runId={selected.id}
+                subject={editSubject}
+                body={editBody}
+                enabled={Boolean(selected.chosenSignal && !isHoldDraft(selected.draft))}
+                disabled={saving || refining}
+                onRefiningChange={setRefining}
+                onRefined={({ subject, body, run }) => {
+                  setEditSubject(subject);
+                  setEditBody(body);
+                  setRuns((prev) => prev.map((r) => (r.id === run.id ? run : r)));
+                  applyServerDraft(selected.id, subject, body);
+                  setSaveMsg("Refined");
+                  window.setTimeout(() => setSaveMsg(null), 1600);
+                }}
+              />
               {selected.status === "needs_review" ? (
                 <div className="actions">
-                  <button className="btn ok" type="button" disabled={saving} onClick={() => void decide("approved")}>
+                  <button
+                    className="btn ok"
+                    type="button"
+                    disabled={saving || refining}
+                    onClick={() => void decide("approved")}
+                  >
                     {isHoldDraft(selected.draft) ? "Store hold (do not send)" : "Approve & store"}
                   </button>
-                  <button className="btn bad" type="button" disabled={saving} onClick={() => void decide("rejected")}>
+                  <button
+                    className="btn bad"
+                    type="button"
+                    disabled={saving || refining}
+                    onClick={() => void decide("rejected")}
+                  >
                     Reject & store
                   </button>
                 </div>
               ) : null}
               <div className="actions">
                 {dirty ? (
-                  <button className="btn ghost" type="button" disabled={saving} onClick={() => void saveEdits()}>
+                  <button
+                    className="btn ghost"
+                    type="button"
+                    disabled={saving || refining}
+                    onClick={() => void saveEdits()}
+                  >
                     {saving ? "Saving…" : "Save edits"}
                   </button>
                 ) : null}
                 <button
                   className="btn ghost"
                   type="button"
+                  disabled={refining}
                   onClick={() => void copyText("email", `Subject: ${editSubject}\n\n${editBody}`)}
                 >
                   {copied === "email" ? "Copied" : "Copy email"}
@@ -426,7 +463,7 @@ export default function HistoryClient() {
                 {isHoldDraft(selected.draft) ? (
                   <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>
                 ) : (
-                  <GmailDraftButton subject={editSubject} body={editBody} disabled={!editBody.trim()} />
+                  <GmailDraftButton subject={editSubject} body={editBody} disabled={refining || !editBody.trim()} />
                 )}
               </div>
               {selected.analysis ? (
