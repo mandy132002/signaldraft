@@ -27,6 +27,14 @@ function formatDuration(ms?: number) {
   return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
+function formatRunWhen(iso: string) {
+  const d = new Date(iso);
+  return {
+    date: d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }),
+    time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+  };
+}
+
 const PAGE_SIZE = 10;
 
 export default function HistoryClient() {
@@ -327,6 +335,7 @@ export default function HistoryClient() {
             </div>
           ) : (
             <>
+              <div className="history-table-wrap">
               <table className="history-table">
                 <thead>
                   <tr>
@@ -338,13 +347,20 @@ export default function HistoryClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRuns.map((r) => (
+                  {pageRuns.map((r) => {
+                    const when = formatRunWhen(r.createdAt);
+                    return (
                     <tr
                       className={`clickable ${r.id === open ? "selected-row" : ""}`}
                       key={r.id}
                       onClick={() => setOpen(r.id === open ? null : r.id)}
                     >
-                      <td>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td>
+                        <span className="run-when">
+                          <span>{when.date}</span>
+                          <span>{when.time}</span>
+                        </span>
+                      </td>
                       <td>
                         {r.prospect.fullName}
                         <div style={{ color: "var(--muted)", fontSize: 12 }}>
@@ -372,9 +388,14 @@ export default function HistoryClient() {
                           <span className="run-status-note">—</span>
                         )}
                       </td>
-                      <td>{r.draft?.subject ?? r.error ?? "—"}</td>
+                      <td>
+                        <span className="run-subject" title={r.draft?.subject ?? r.error ?? undefined}>
+                          {r.draft?.subject ?? r.error ?? "—"}
+                        </span>
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {!filtered.length ? (
                     <tr>
                       <td colSpan={5} style={{ color: "var(--muted)" }}>
@@ -388,6 +409,7 @@ export default function HistoryClient() {
                   ) : null}
                 </tbody>
               </table>
+              </div>
 
               {filtered.length > 0 ? (
                 <div className="pagination" role="navigation" aria-label="Run history pages">

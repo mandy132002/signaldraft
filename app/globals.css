@@ -743,9 +743,6 @@ tr.selected-row:hover { background: var(--copper-soft); }
 .history-table td {
   vertical-align: middle;
 }
-.history-table td:nth-child(3) {
-  width: 9.5rem;
-}
 .run-status {
   display: flex;
   flex-direction: column;
@@ -1024,9 +1021,62 @@ tr.selected-row:hover { background: var(--copper-soft); }
 
 .history-layout {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   gap: 18px;
   align-items: start;
+}
+.history-layout > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.history-table-wrap {
+  overflow-x: auto;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+}
+.history-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.history-table th:nth-child(1),
+.history-table td:nth-child(1) { width: 6.75rem; }
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) { width: 28%; }
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) { width: 7.25rem; }
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) { width: 5.75rem; }
+.history-table td:nth-child(2),
+.history-table td:nth-child(5) {
+  overflow: hidden;
+}
+.history-table td:nth-child(2) > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.run-when span:last-child {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.run-subject {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stored-email {
+  background: var(--card-solid);
+  isolation: isolate;
+  backdrop-filter: none;
 }
 
 .signals-check {
@@ -1065,9 +1115,6 @@ tr.selected-row:hover { background: var(--copper-soft); }
   font-size: 13px !important;
 }
 
-.history-table td:nth-child(4) {
-  width: 5.5rem;
-}
 .history-table td:nth-child(4) .badge {
   text-transform: capitalize;
 }
@@ -1327,6 +1374,10 @@ code {
   background: rgba(31, 30, 29, 0.05);
   padding: 2px 6px;
   border-radius: 6px;
+}
+
+@media (max-width: 1100px) {
+  .history-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {
