@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import {
@@ -53,6 +54,11 @@ export default function HistoryClient() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [refining, setRefining] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function load(opts?: { initial?: boolean }) {
     try {
@@ -502,7 +508,8 @@ export default function HistoryClient() {
         </div>
       </div>
 
-      {selected ? (
+      {mounted && selected
+        ? createPortal(
         <div
           className="email-modal-backdrop"
           onClick={() => setOpen(null)}
@@ -699,8 +706,10 @@ export default function HistoryClient() {
               </>
             )}
           </div>
-        </div>
-      ) : null}
+        </div>,
+            document.body
+          )
+        : null}
     </Shell>
   );
 }

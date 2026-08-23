@@ -1101,16 +1101,18 @@ tr.selected-row:hover { background: var(--copper-soft); }
 .email-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  padding: 20px 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
   background: rgba(31, 30, 29, 0.42);
   backdrop-filter: blur(8px);
 }
 .email-modal {
-  width: min(880px, 100%);
-  max-height: min(92vh, 960px);
+  flex: 0 1 auto;
+  width: min(880px, calc(100vw - 32px));
+  max-height: min(90vh, 960px);
   overflow: auto;
   padding: 0 24px 28px;
   border: 1px solid var(--line);
