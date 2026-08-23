@@ -5,7 +5,6 @@ import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { StageEvent } from "@/lib/types";
 import { ClaudeSpark } from "./ClaudeSpark";
 import { GmailDraftButton } from "./GmailDraftButton";
-import { HomeBackdrop } from "./HomeBackdrop";
 import { RefineEmailBox } from "./RefineEmailBox";
 import { SignalsCheck } from "./SignalsCheck";
 import { useLiveSession } from "./LiveSession";
@@ -190,11 +189,9 @@ export default function HomePage() {
   const workspaceActive = busy || !!run || !!subject || !!body;
 
   return (
-    <>
-    <HomeBackdrop dimmed={workspaceActive} />
     <Shell>
       {!workspaceActive ? (
-        <div className="lede-intake home-hero" style={{ marginBottom: 28 }}>
+        <div className="lede-intake" style={{ marginBottom: 28 }}>
           <p
             style={{
               margin: "0 0 10px",
@@ -218,6 +215,7 @@ export default function HomePage() {
               letterSpacing: "-0.04em",
               margin: "0 0 12px",
               lineHeight: 1.1,
+              color: "var(--ink)",
             }}
           >
             Who are you writing to?
@@ -509,7 +507,6 @@ export default function HomePage() {
         </div>
       </div>
     </Shell>
-    </>
   );
 }
 

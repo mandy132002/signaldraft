@@ -2,11 +2,14 @@
 
 import { SessionProvider } from "next-auth/react";
 import { LiveSessionProvider } from "./LiveSession";
+import { ThemeProvider } from "./ThemeProvider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <LiveSessionProvider>{children}</LiveSessionProvider>
+      <ThemeProvider>
+        <LiveSessionProvider>{children}</LiveSessionProvider>
+      </ThemeProvider>
     </SessionProvider>
   );
 }

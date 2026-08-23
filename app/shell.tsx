@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AuthMenu } from "./AuthMenu";
 import { BrandMark } from "./BrandMark";
 import { ClaudeSpark } from "./ClaudeSpark";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Shell({
   children,
@@ -24,7 +25,9 @@ export function Shell({
           Signal<span>Draft</span>
         </Link>
         {bare ? (
-          <div className="nav" aria-hidden />
+          <div className="topbar-right">
+            <ThemeToggle />
+          </div>
         ) : (
           <div className="topbar-right">
             <nav className="nav" aria-label="Primary">
@@ -38,6 +41,7 @@ export function Shell({
                 Dashboard
               </Link>
             </nav>
+            <ThemeToggle />
             <AuthMenu />
           </div>
         )}
