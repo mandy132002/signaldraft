@@ -25,6 +25,12 @@
   --topbar: rgba(255, 252, 248, 0.72);
   --nav-track: rgba(31, 30, 29, 0.04);
   --nav-hover: rgba(255, 255, 255, 0.85);
+  --nav-active: var(--card-solid);
+  --hover-lift: #ffffff;
+  --btn: #1f1e1d;
+  --btn-fg: #faf7f2;
+  --btn-hover: #2c2a27;
+  --btn-hover-fg: #faf7f2;
   --body-a: #faf7f2;
   --body-b: #f3efe8;
   --wash: #fff8f3;
@@ -66,8 +72,14 @@
   --lift-strong: #2c2926;
   --lift-soft: rgba(255, 255, 255, 0.05);
   --topbar: rgba(28, 26, 24, 0.8);
-  --nav-track: rgba(255, 255, 255, 0.06);
-  --nav-hover: rgba(255, 255, 255, 0.08);
+  --nav-track: rgba(255, 255, 255, 0.07);
+  --nav-hover: rgba(255, 255, 255, 0.12);
+  --nav-active: #4a433c;
+  --hover-lift: #3d3833;
+  --btn: #f3efe8;
+  --btn-fg: #161412;
+  --btn-hover: #ffffff;
+  --btn-hover-fg: #161412;
   --body-a: #121110;
   --body-b: #0e0d0c;
   --wash: #2a221d;
@@ -86,9 +98,31 @@
 [data-theme="dark"] .bulk-drop.over,
 [data-theme="dark"] .bulk-drop.has-file,
 [data-theme="dark"] .bulk-queue-item.active,
-[data-theme="dark"] .bulk-queue-item.active:hover:not(:disabled),
-[data-theme="dark"] .btn-ai-refine:hover:not(:disabled) {
+[data-theme="dark"] .bulk-queue-item.active:hover:not(:disabled) {
   background: var(--wash);
+}
+[data-theme="dark"] .nav a.active {
+  color: #fff8f2;
+  box-shadow: inset 0 0 0 1px rgba(243, 239, 232, 0.18);
+}
+[data-theme="dark"] .btn.ghost.gmail-draft-btn {
+  background: var(--lift-soft);
+}
+[data-theme="dark"] .btn.ghost.gmail-draft-btn:hover:not(:disabled) {
+  background: #3d2c2a;
+  color: var(--ink);
+}
+[data-theme="dark"] .btn-ai-refine:hover:not(:disabled) {
+  background:
+    linear-gradient(var(--hover-lift), var(--hover-lift)) padding-box,
+    linear-gradient(
+      120deg,
+      var(--copper),
+      rgba(147, 112, 219, 0.55),
+      rgba(61, 122, 92, 0.4),
+      var(--copper-2)
+    )
+    border-box;
 }
 
 * { box-sizing: border-box; }
@@ -205,12 +239,12 @@ a { color: inherit; text-decoration: none; }
 }
 .nav a.active {
   color: var(--ink);
-  background: var(--card-solid);
+  background: var(--nav-active);
   box-shadow: var(--shadow-sm);
 }
 .nav a.active:hover {
   color: var(--ink);
-  background: var(--card-solid);
+  background: var(--nav-active);
 }
 
 .theme-toggle {
@@ -228,7 +262,7 @@ a { color: inherit; text-decoration: none; }
 }
 .theme-toggle:hover {
   border-color: var(--line-strong);
-  background: var(--lift-strong);
+  background: var(--hover-lift);
 }
 .theme-toggle:active {
   transform: scale(0.96);
@@ -271,7 +305,7 @@ a { color: inherit; text-decoration: none; }
 }
 .auth-chip:hover {
   border-color: var(--line-strong);
-  background: var(--lift-strong);
+  background: var(--hover-lift);
   color: var(--ink);
 }
 .auth-chip:active { transform: scale(0.97); }
@@ -495,8 +529,8 @@ button {
 
 .btn {
   margin-top: 18px;
-  background: var(--ink);
-  color: #faf7f2;
+  background: var(--btn);
+  color: var(--btn-fg);
   padding: 12px 16px;
   width: 100%;
   letter-spacing: 0.01em;
@@ -511,8 +545,8 @@ button {
     box-shadow 0.2s var(--ease);
 }
 .btn:not(.ghost):not(.ok):not(.bad):not(.btn-ai-refine):not(.btn-ai-generate):hover:not(:disabled) {
-  background: #2c2a27;
-  color: #faf7f2;
+  background: var(--btn-hover);
+  color: var(--btn-hover-fg);
   box-shadow: var(--shadow-md);
 }
 .btn:active:not(:disabled) { transform: scale(0.985); }
@@ -526,7 +560,7 @@ button {
   box-shadow: none;
 }
 .btn.ghost:hover:not(:disabled) {
-  background: var(--card-solid);
+  background: var(--hover-lift);
   color: var(--ink);
   border-color: var(--line-strong);
   box-shadow: var(--shadow-sm);
