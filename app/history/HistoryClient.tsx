@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { RunRecord } from "@/lib/types";
 import { Shell } from "../shell";
+import { ClaudeSpark } from "../ClaudeSpark";
 import { GmailDraftButton } from "../GmailDraftButton";
 import { useLiveSession } from "../LiveSession";
 
@@ -20,6 +21,7 @@ export default function HistoryClient() {
   const search = useSearchParams();
   const { applyServerDraft } = useLiveSession();
   const [runs, setRuns] = useState<RunRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -28,14 +30,18 @@ export default function HistoryClient() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  async function load() {
-    const res = await fetch("/api/runs", { cache: "no-store" });
-    const json = await res.json();
-    setRuns(json.runs ?? []);
+  async function load(opts?: { initial?: boolean }) {
+    try {
+      const res = await fetch("/api/runs", { cache: "no-store" });
+      const json = await res.json();
+      setRuns(json.runs ?? []);
+    } finally {
+      if (opts?.initial) setLoading(false);
+    }
   }
 
   useEffect(() => {
-    void load();
+    void load({ initial: true });
     const t = setInterval(() => void load(), 5000);
     return () => clearInterval(t);
   }, []);
@@ -185,23 +191,20 @@ export default function HistoryClient() {
           Open a run to review its email. Approve or reject items still in review. Edit and save anytime.
         </p>
       </div>
-      <div className="kpis">
-        <div className="kpi">
-          <b>{kpis.total}</b>
-          <span>Runs</span>
-        </div>
-        <div className="kpi">
-          <b>{kpis.withEmail}</b>
-          <span>Emails stored</span>
-        </div>
-        <div className="kpi">
-          <b>{kpis.review}</b>
-          <span>Needs review</span>
-        </div>
-        <div className="kpi">
-          <b>{kpis.approved}</b>
-          <span>Approved</span>
-        </div>
+      <div className="kpis" aria-busy={loading}>
+        {(
+          [
+            ["Runs", kpis.total],
+            ["Emails stored", kpis.withEmail],
+            ["Needs review", kpis.review],
+            ["Approved", kpis.approved],
+          ] as const
+        ).map(([label, value]) => (
+          <div className={`kpi ${loading ? "kpi-loading" : ""}`} key={label}>
+            <b>{loading ? <span className="kpi-skeleton" aria-hidden /> : value}</b>
+            <span>{label}</span>
+          </div>
+        ))}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -210,62 +213,82 @@ export default function HistoryClient() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Prospect, company, subject, hook…"
+          disabled={loading}
         />
       </div>
 
       <div className="history-layout">
         <div className="card">
-          <h2>Run history</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Prospect</th>
-                <th>Status</th>
-                <th>Email subject</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr
-                  className={`clickable ${r.id === open ? "selected-row" : ""}`}
-                  key={r.id}
-                  onClick={() => setOpen(r.id === open ? null : r.id)}
-                >
-                  <td>{new Date(r.createdAt).toLocaleString()}</td>
-                  <td>
-                    {r.prospect.fullName}
-                    <div style={{ color: "var(--muted)", fontSize: 12 }}>
-                      {r.prospect.title} · {r.prospect.company}
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
-                    {r.status === "approved" || r.status === "rejected" ? (
-                      <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>email stored</div>
-                    ) : r.draft?.body ? (
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>awaiting decision</div>
-                    ) : null}
-                  </td>
-                  <td>{r.draft?.subject ?? r.error ?? "—"}</td>
-                </tr>
-              ))}
-              {!filtered.length ? (
+          <h2>
+            Run history{" "}
+            {loading ? (
+              <span style={{ marginLeft: 8, verticalAlign: "middle" }}>
+                <ClaudeSpark size={16} />
+              </span>
+            ) : null}
+          </h2>
+          {loading ? (
+            <div className="dashboard-loading" aria-live="polite">
+              <ClaudeSpark size={22} />
+              <p>Loading saved runs…</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={4} style={{ color: "var(--muted)" }}>
-                    {runs.length ? "No matches." : "No saved runs yet. Generate a draft from Live run."}
-                  </td>
+                  <th>When</th>
+                  <th>Prospect</th>
+                  <th>Status</th>
+                  <th>Email subject</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((r) => (
+                  <tr
+                    className={`clickable ${r.id === open ? "selected-row" : ""}`}
+                    key={r.id}
+                    onClick={() => setOpen(r.id === open ? null : r.id)}
+                  >
+                    <td>{new Date(r.createdAt).toLocaleString()}</td>
+                    <td>
+                      {r.prospect.fullName}
+                      <div style={{ color: "var(--muted)", fontSize: 12 }}>
+                        {r.prospect.title} · {r.prospect.company}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
+                      {r.status === "approved" || r.status === "rejected" ? (
+                        <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>email stored</div>
+                      ) : r.draft?.body ? (
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>awaiting decision</div>
+                      ) : null}
+                    </td>
+                    <td>{r.draft?.subject ?? r.error ?? "—"}</td>
+                  </tr>
+                ))}
+                {!filtered.length ? (
+                  <tr>
+                    <td colSpan={4} style={{ color: "var(--muted)" }}>
+                      {runs.length ? "No matches." : "No saved runs yet. Generate a draft from Live run."}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          )}
         </div>
 
         <div className="card">
           <h2>
             Stored email {saveMsg ? <span className="badge needs_review">{saveMsg}</span> : null}
           </h2>
-          {!selected ? (
+          {loading ? (
+            <div className="dashboard-loading" aria-live="polite">
+              <ClaudeSpark size={22} />
+              <p>Loading email…</p>
+            </div>
+          ) : !selected ? (
             <p className="hint" style={{ marginTop: 0 }}>
               Select a run on the left. Approve or reject on Live run to store the final email.
             </p>

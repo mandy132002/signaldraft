@@ -690,6 +690,44 @@ tr.clickable:hover { background: rgba(255, 255, 255, 0.55); }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.kpi-loading b {
+  min-height: 1.1em;
+  display: flex;
+  align-items: center;
+}
+.kpi-skeleton {
+  display: block;
+  width: 2.2em;
+  height: 0.72em;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(31, 30, 29, 0.06) 0%,
+    rgba(31, 30, 29, 0.12) 50%,
+    rgba(31, 30, 29, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: kpi-shimmer 1.1s ease-in-out infinite;
+}
+@keyframes kpi-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 160px;
+  padding: 28px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+.dashboard-loading p {
+  margin: 0;
+  font-size: 14px;
+}
 
 .hint {
   font-size: 12.5px;
