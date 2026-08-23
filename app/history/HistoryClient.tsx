@@ -353,7 +353,18 @@ export default function HistoryClient() {
                     <tr
                       className={`clickable ${r.id === open ? "selected-row" : ""}`}
                       key={r.id}
-                      onClick={() => setOpen(r.id === open ? null : r.id)}
+                      onClick={() => {
+                        const next = r.id === open ? null : r.id;
+                        setOpen(next);
+                        if (next) {
+                          window.requestAnimationFrame(() => {
+                            document.getElementById("stored-email")?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                          });
+                        }
+                      }}
                     >
                       <td>
                         <span className="run-when">
@@ -445,7 +456,7 @@ export default function HistoryClient() {
           )}
         </div>
 
-        <div className="card stored-email">
+        <div className="card stored-email" id="stored-email">
           <h2>
             Stored email {saveMsg ? <span className="badge needs_review">{saveMsg}</span> : null}
           </h2>
@@ -456,7 +467,7 @@ export default function HistoryClient() {
             </div>
           ) : !selected ? (
             <p className="hint" style={{ marginTop: 0 }}>
-              Select a run on the left. Approve or reject on Live run to store the final email.
+              Select a run in the table above. Approve or reject on Live run to store the final email.
             </p>
           ) : !selected.draft ? (
             <p className="hint" style={{ marginTop: 0 }}>
@@ -475,24 +486,27 @@ export default function HistoryClient() {
                   <strong>Sensitive public event.</strong> Review tone before you copy this to your mailbox.
                 </div>
               ) : null}
-              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--muted)" }}>
-                To {selected.prospect.fullName} · {selected.prospect.company}
-                <br />
-                Hook: {selected.draft.hook}
-                <br />
-                {selected.draft.model}{" "}
-                <span className={`badge confidence-${selected.draft.confidence}`}>
-                  Confidence {selected.draft.confidence}
-                </span>
-                {selected.draft.hold ? " · hold" : ""}
-                {selected.reviewNote ? ` · note: ${selected.reviewNote}` : ""}
-                <br />
-                {selected.status === "approved" || selected.status === "rejected"
-                  ? `Stored · ${selected.status}`
-                  : selected.status === "needs_review"
-                    ? "Needs review — approve or reject to store"
-                    : selected.status}
-              </p>
+              <div className="stored-email-meta">
+                <p>
+                  To {selected.prospect.fullName} · {selected.prospect.company}
+                </p>
+                <p>Hook: {selected.draft.hook}</p>
+                <p className="stored-email-model">
+                  {selected.draft.model}{" "}
+                  <span className={`badge confidence-${selected.draft.confidence}`}>
+                    Confidence {selected.draft.confidence}
+                  </span>
+                  {selected.draft.hold ? " · hold" : ""}
+                  {selected.reviewNote ? ` · note: ${selected.reviewNote}` : ""}
+                </p>
+                <p>
+                  {selected.status === "approved" || selected.status === "rejected"
+                    ? `Stored · ${selected.status}`
+                    : selected.status === "needs_review"
+                      ? "Needs review — approve or reject to store"
+                      : selected.status}
+                </p>
+              </div>
               <SignalsCheck
                 key={selected.id}
                 signals={selected.signals ?? []}
