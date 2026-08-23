@@ -342,7 +342,6 @@ export default function HistoryClient() {
                     <th>When</th>
                     <th>Prospect</th>
                     <th>Status</th>
-                    <th>Confidence</th>
                     <th>Email subject</th>
                   </tr>
                 </thead>
@@ -353,18 +352,7 @@ export default function HistoryClient() {
                     <tr
                       className={`clickable ${r.id === open ? "selected-row" : ""}`}
                       key={r.id}
-                      onClick={() => {
-                        const next = r.id === open ? null : r.id;
-                        setOpen(next);
-                        if (next) {
-                          window.requestAnimationFrame(() => {
-                            document.getElementById("stored-email")?.scrollIntoView({
-                              behavior: "smooth",
-                              block: "start",
-                            });
-                          });
-                        }
-                      }}
+                      onClick={() => setOpen(r.id === open ? null : r.id)}
                     >
                       <td>
                         <span className="run-when">
@@ -380,24 +368,22 @@ export default function HistoryClient() {
                       </td>
                       <td>
                         <div className="run-status">
-                          <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
+                          <span className="run-status-badges">
+                            <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
+                            {r.draft?.hold || (r.draft && isHoldDraft(r.draft)) ? (
+                              <span className="badge hold">Hold</span>
+                            ) : r.draft?.confidence ? (
+                              <span className={`badge confidence-${r.draft.confidence}`}>
+                                {r.draft.confidence}
+                              </span>
+                            ) : null}
+                          </span>
                           {r.status === "approved" || r.status === "rejected" ? (
                             <span className="run-status-note ok">email stored</span>
                           ) : r.draft?.body ? (
                             <span className="run-status-note">awaiting decision</span>
                           ) : null}
                         </div>
-                      </td>
-                      <td>
-                        {r.draft?.hold || (r.draft && isHoldDraft(r.draft)) ? (
-                          <span className="badge hold">Hold</span>
-                        ) : r.draft?.confidence ? (
-                          <span className={`badge confidence-${r.draft.confidence}`}>
-                            {r.draft.confidence}
-                          </span>
-                        ) : (
-                          <span className="run-status-note">—</span>
-                        )}
                       </td>
                       <td>
                         <span className="run-subject" title={r.draft?.subject ?? r.error ?? undefined}>
@@ -409,7 +395,7 @@ export default function HistoryClient() {
                   })}
                   {!filtered.length ? (
                     <tr>
-                      <td colSpan={5} style={{ color: "var(--muted)" }}>
+                      <td colSpan={4} style={{ color: "var(--muted)" }}>
                         {runs.length
                           ? filtersActive
                             ? "No runs match your filters."
@@ -467,7 +453,7 @@ export default function HistoryClient() {
             </div>
           ) : !selected ? (
             <p className="hint" style={{ marginTop: 0 }}>
-              Select a run in the table above. Approve or reject on Live run to store the final email.
+              Select a run on the left. Approve or reject on Live run to store the final email.
             </p>
           ) : !selected.draft ? (
             <p className="hint" style={{ marginTop: 0 }}>
