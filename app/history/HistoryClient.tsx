@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
+import {
+  CONFIDENCE_FILTER_OPTIONS,
+  TIME_FRAME_OPTIONS,
+  filterDashboardRuns,
+  hasActiveDashboardFilters,
+  type ConfidenceFilter,
+  type TimeFrame,
+} from "@/lib/dashboard-filters";
 import type { RunRecord } from "@/lib/types";
 import { Shell } from "../shell";
 import { ClaudeSpark } from "../ClaudeSpark";
@@ -29,6 +37,8 @@ export default function HistoryClient() {
   const [page, setPage] = useState(1);
   const [copied, setCopied] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>("all");
+  const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
   const [editSubject, setEditSubject] = useState("");
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -82,25 +92,21 @@ export default function HistoryClient() {
     return { total: runs.length, withEmail, review, approved };
   }, [runs]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return runs;
-    return runs.filter((r) => {
-      const hay = [
-        r.prospect.fullName,
-        r.prospect.company,
-        r.prospect.title,
-        r.draft?.subject,
-        r.draft?.body,
-        r.draft?.hook,
-        r.status,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(needle);
-    });
-  }, [runs, q]);
+  const filtered = useMemo(
+    () =>
+      filterDashboardRuns(runs, {
+        query: q,
+        timeFrame,
+        confidence: confidenceFilter,
+      }),
+    [runs, q, timeFrame, confidenceFilter]
+  );
+
+  const filtersActive = hasActiveDashboardFilters({
+    query: q,
+    timeFrame,
+    confidence: confidenceFilter,
+  });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -112,7 +118,7 @@ export default function HistoryClient() {
 
   useEffect(() => {
     setPage(1);
-  }, [q]);
+  }, [q, timeFrame, confidenceFilter]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -237,14 +243,70 @@ export default function HistoryClient() {
         ))}
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <label>Search saved emails</label>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Prospect, company, subject, hook…"
-          disabled={loading}
-        />
+      <div className="card dashboard-filters" style={{ marginBottom: 16 }}>
+        <div className="dashboard-filters-grid">
+          <div className="filter-field filter-field-wide">
+            <label htmlFor="dashboard-search">Search saved emails</label>
+            <input
+              id="dashboard-search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Prospect, company, subject, hook…"
+              disabled={loading}
+            />
+          </div>
+          <div className="filter-field">
+            <label htmlFor="dashboard-timeframe">Time frame</label>
+            <select
+              id="dashboard-timeframe"
+              value={timeFrame}
+              onChange={(e) => setTimeFrame(e.target.value as TimeFrame)}
+              disabled={loading}
+            >
+              {TIME_FRAME_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-field">
+            <label htmlFor="dashboard-confidence">Confidence</label>
+            <select
+              id="dashboard-confidence"
+              value={confidenceFilter}
+              onChange={(e) => setConfidenceFilter(e.target.value as ConfidenceFilter)}
+              disabled={loading}
+            >
+              {CONFIDENCE_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {filtersActive ? (
+          <div className="dashboard-filters-meta">
+            <p className="hint" style={{ margin: 0 }}>
+              Showing {filtered.length} of {runs.length} runs
+              {filtersActive ? " · filters active" : ""}
+            </p>
+            <button
+              type="button"
+              className="btn ghost dashboard-clear-filters"
+              disabled={loading}
+              onClick={() => {
+                setQ("");
+                setTimeFrame("all");
+                setConfidenceFilter("all");
+                setPage(1);
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="history-layout">
@@ -264,12 +326,13 @@ export default function HistoryClient() {
             </div>
           ) : (
             <>
-              <table>
+              <table className="history-table">
                 <thead>
                   <tr>
                     <th>When</th>
                     <th>Prospect</th>
                     <th>Status</th>
+                    <th>Confidence</th>
                     <th>Email subject</th>
                   </tr>
                 </thead>
@@ -288,20 +351,37 @@ export default function HistoryClient() {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
-                        {r.status === "approved" || r.status === "rejected" ? (
-                          <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>email stored</div>
-                        ) : r.draft?.body ? (
-                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>awaiting decision</div>
-                        ) : null}
+                        <div className="run-status">
+                          <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
+                          {r.status === "approved" || r.status === "rejected" ? (
+                            <span className="run-status-note ok">email stored</span>
+                          ) : r.draft?.body ? (
+                            <span className="run-status-note">awaiting decision</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        {r.draft?.hold || (r.draft && isHoldDraft(r.draft)) ? (
+                          <span className="badge hold">Hold</span>
+                        ) : r.draft?.confidence ? (
+                          <span className={`badge confidence-${r.draft.confidence}`}>
+                            {r.draft.confidence}
+                          </span>
+                        ) : (
+                          <span className="run-status-note">—</span>
+                        )}
                       </td>
                       <td>{r.draft?.subject ?? r.error ?? "—"}</td>
                     </tr>
                   ))}
                   {!filtered.length ? (
                     <tr>
-                      <td colSpan={4} style={{ color: "var(--muted)" }}>
-                        {runs.length ? "No matches." : "No saved runs yet. Generate a draft from Live run."}
+                      <td colSpan={5} style={{ color: "var(--muted)" }}>
+                        {runs.length
+                          ? filtersActive
+                            ? "No runs match your filters."
+                            : "No matches."
+                          : "No saved runs yet. Generate a draft from Live run."}
                       </td>
                     </tr>
                   ) : null}
@@ -313,7 +393,7 @@ export default function HistoryClient() {
                   <p className="pagination-meta">
                     Showing {(safePage - 1) * PAGE_SIZE + 1}–
                     {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
-                    {q.trim() ? " matches" : " runs"}
+                    {filtersActive ? " filtered" : q.trim() ? " matches" : " runs"}
                   </p>
                   <div className="pagination-controls">
                     <button
