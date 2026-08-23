@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { mergeWorkplaceContext } from "./company-site";
 import { noHookDraft } from "./draft";
 import { isHoldDraft, isSensitiveHook } from "./edge-cases";
 import {
@@ -23,6 +24,7 @@ import {
   pickHook,
   type RankedSignal,
 } from "./relevance";
+import { normalizeWebsiteUrl } from "./scrape";
 import type { ProspectInput } from "./types";
 
 const cube: ProspectInput = {
@@ -256,5 +258,30 @@ describe("same-name companies — LinkedIn workplace", () => {
     assert.equal(mentionsLinkedInWorkplace(`${right.title} ${right.summary}`, linkedIn), true);
     assert.equal(mentionsLinkedInWorkplace(wrong.title, linkedIn), false);
     assert.equal(pickHook([wrong, right], colin, linkedIn)?.id, "right");
+  });
+});
+
+describe("company website workplace", () => {
+  it("normalizes website URLs", () => {
+    assert.equal(normalizeWebsiteUrl("cube.dev")?.host, "cube.dev");
+    assert.equal(normalizeWebsiteUrl("https://www.amazon.com/path")?.host, "amazon.com");
+    assert.equal(normalizeWebsiteUrl("not a url"), null);
+  });
+
+  it("merges website domain into workplace context for ranking", () => {
+    const site = {
+      url: "https://cube.dev",
+      host: "cube.dev",
+      domain: "cube.dev",
+      fetched: true,
+      matchesCompany: true as boolean | null,
+      note: "ok",
+      orgName: "Cube",
+    };
+    const merged = mergeWorkplaceContext(null, site);
+    assert.ok(merged);
+    assert.equal(merged!.employerMatchesCompany, true);
+    assert.ok(merged!.domainHints.includes("cube.dev"));
+    assert.equal(mentionsLinkedInWorkplace("Cube.dev launches semantic layer", merged), true);
   });
 });

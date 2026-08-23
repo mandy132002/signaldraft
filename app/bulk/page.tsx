@@ -146,7 +146,7 @@ export default function BulkPage() {
             <p className="bulk-drop-title">{csvText ? fileName : "Drop CSV here"}</p>
             <p className="hint" style={{ margin: "6px 0 14px" }}>
               Required columns: <code>fullName</code> (or name), <code>company</code>. Optional: title,
-              linkedinUrl, notes. Max {MAX_BULK_ROWS} rows.
+              linkedinUrl, companyWebsite, notes. Max {MAX_BULK_ROWS} rows.
             </p>
             <div className="bulk-drop-actions">
               <label className="btn ghost bulk-file-btn">
@@ -234,6 +234,7 @@ export default function BulkPage() {
                   <th>Title</th>
                   <th>Company</th>
                   <th>LinkedIn</th>
+                  <th>Website</th>
                 </tr>
               </thead>
               <tbody>
@@ -244,6 +245,7 @@ export default function BulkPage() {
                     <td>{p.title || "—"}</td>
                     <td>{p.company}</td>
                     <td>{p.linkedinUrl ? "Yes" : "—"}</td>
+                    <td>{p.companyWebsite ? "Yes" : "—"}</td>
                   </tr>
                 ))}
               </tbody>

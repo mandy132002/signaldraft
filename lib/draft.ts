@@ -100,7 +100,7 @@ export function noHookDraft(prospect: ProspectInput): OutreachDraft {
 
 No public signal could be confirmed as being about ${prospect.fullName} at ${prospect.company}. Better to hold than invent a hook or email a lookalike company.
 
-If you have a source, add a LinkedIn URL or a note and run again.
+If you have a source, add a LinkedIn URL, company website, or a note and run again.
 
 — ${sender} (internal)`,
     hook: "No confirmed entity match",
@@ -253,7 +253,7 @@ export async function resolveAndAnalyze(
     isAmbiguousCompanyName(prospect.company) &&
     linkedIn?.employerMatchesCompany !== true
   ) {
-    entityNote = `${entityNote} · Ambiguous company "${prospect.company}" — add LinkedIn so we can confirm the workplace.`;
+    entityNote = `${entityNote} · Ambiguous company "${prospect.company}" — add LinkedIn or company website so we can confirm the workplace.`;
   }
   if (!hook) return { signals, hook: undefined, analysis: null, llm: up, entityNote };
 

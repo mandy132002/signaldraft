@@ -309,10 +309,16 @@ export default function HomePage() {
             onChange={set("linkedinUrl")}
             placeholder="https://linkedin.com/in/… — used to confirm which company they work at"
           />
+          <label>Company website {form.company.trim().split(/\s+/).length <= 1 ? "(recommended)" : "(optional)"}</label>
+          <input
+            value={form.companyWebsite || ""}
+            onChange={set("companyWebsite")}
+            placeholder="https://cube.dev — scraped for context + news search"
+          />
           {form.company.trim().split(/\s+/).filter(Boolean).length === 1 ? (
             <p className="hint" style={{ marginTop: 6 }}>
-              Short company names collide often (Cube, Meta, Delta). Paste the prospect’s LinkedIn so we pick the workplace
-              that matches their profile — or use a precise name (e.g. Cube.dev / Cube Global).
+              Short company names collide often (Cube, Meta, Delta). Paste LinkedIn and/or the company website so we
+              pick the right org — or use a precise name (e.g. Cube.dev / Cube Global).
             </p>
           ) : null}
           <label>You (SDR) — name / your company</label>
@@ -507,8 +513,8 @@ export default function HomePage() {
               {run?.draft && isHoldDraft(run.draft) ? (
                 <div className="callout hold">
                   <strong>No confirmed public hook</strong> for {run.prospect.fullName} at {run.prospect.company}.
-                  This is an internal hold, not an email. Add a LinkedIn URL or a source note and run again — do not
-                  send this text.
+                  This is an internal hold, not an email. Add a LinkedIn URL, company website, or a source note and run
+                  again — do not                  send this text.
                 </div>
               ) : run?.draft?.sensitiveHook || (run?.chosenSignal && signalIsSensitive(run.chosenSignal)) ? (
                 <div className="callout sensitive">
@@ -653,7 +659,7 @@ export default function HomePage() {
 
 const defaultStages: StageEvent[] = [
   { id: "intake", label: "Intake prospect", detail: "Waiting", status: "pending", at: "" },
-  { id: "company", label: "Company + LinkedIn context", detail: "Waiting", status: "pending", at: "" },
+  { id: "company", label: "Company + LinkedIn / website", detail: "Waiting", status: "pending", at: "" },
   { id: "news", label: "Public news & funding", detail: "Waiting", status: "pending", at: "" },
   { id: "hiring", label: "Person + company signals", detail: "Waiting", status: "pending", at: "" },
   { id: "rank", label: "Soft-rank candidates", detail: "Waiting", status: "pending", at: "" },

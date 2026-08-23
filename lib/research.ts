@@ -1,4 +1,10 @@
 import { XMLParser } from "fast-xml-parser";
+import {
+  companyWebsiteAsSignal,
+  companyWebsiteSearchPhrases,
+  loadCompanyWebsiteContext,
+  mergeWorkplaceContext,
+} from "./company-site";
 import { linkedInHintTokens, linkedInCompanySearchPhrases, loadLinkedInContext, parseLinkedInUrl } from "./linkedin";
 import { offerKeywords, offerNewsQueryClause } from "./offer";
 import {
@@ -220,14 +226,22 @@ export async function researchProspect(
   kept: number;
   dropped: number;
   linkedIn: Awaited<ReturnType<typeof loadLinkedInContext>>;
+  companySite: Awaited<ReturnType<typeof loadCompanyWebsiteContext>>;
 }> {
   const notes: string[] = [];
   const phrase = exactCompanyPhrase(input.company);
   const qCompany = quoted(phrase);
   const personQuoted = quoted(input.fullName.trim());
-  const linkedIn = await loadLinkedInContext(input);
+  const [linkedIn, companySite] = await Promise.all([
+    loadLinkedInContext(input),
+    loadCompanyWebsiteContext(input),
+  ]);
+  const workplace = mergeWorkplaceContext(linkedIn, companySite);
   const liTokens = linkedInHintTokens(linkedIn?.vanity || parseLinkedInUrl(input.linkedinUrl)?.vanity);
-  const workplacePhrases = linkedInCompanySearchPhrases(input.company, linkedIn);
+  const workplacePhrases = [
+    ...linkedInCompanySearchPhrases(input.company, linkedIn),
+    ...companyWebsiteSearchPhrases(companySite),
+  ].filter((p, i, a) => a.findIndex((x) => x.toLowerCase() === p.toLowerCase()) === i);
   const softToken = distinctiveCompanyTokens(input.company)[0];
   const offerClause = offerNewsQueryClause(input.senderOffer);
   const offerKws = offerKeywords(input.senderOffer);
@@ -244,18 +258,19 @@ export async function researchProspect(
     if (linkedIn.domainHints.length) {
       notes.push(`LinkedIn domains: ${linkedIn.domainHints.join(", ")}`);
     }
-    if (isAmbiguousCompanyName(input.company) && linkedIn.employerMatchesCompany !== true) {
-      notes.push(
-        `Ambiguous company name "${input.company}" — add a precise legal name or ensure LinkedIn shows this workplace.`
-      );
-    }
   } else {
     notes.push("No LinkedIn URL provided.");
-    if (isAmbiguousCompanyName(input.company)) {
-      notes.push(
-        `Ambiguous company name "${input.company}" — LinkedIn URL strongly recommended to pick the right org.`
-      );
-    }
+  }
+  if (companySite) {
+    notes.push(`Company website: ${companySite.url} · ${companySite.note}`);
+    if (companySite.orgName) notes.push(`Website org name: ${companySite.orgName}`);
+  } else {
+    notes.push("No company website provided.");
+  }
+  if (isAmbiguousCompanyName(input.company) && workplace?.employerMatchesCompany !== true) {
+    notes.push(
+      `Ambiguous company name "${input.company}" — add LinkedIn and/or company website (e.g. cube.dev) to pick the right org.`
+    );
   }
 
   const tasks: Promise<Signal[]>[] = [
@@ -360,8 +375,8 @@ export async function researchProspect(
     );
   }
 
-  // Same-name companies: search LinkedIn workplace aliases / domains (cube.dev, etc.)
-  for (const phraseExtra of workplacePhrases) {
+  // Same-name companies: search LinkedIn / website workplace aliases / domains (cube.dev, etc.)
+  for (const phraseExtra of workplacePhrases.slice(0, 5)) {
     const qExtra = quoted(phraseExtra);
     tasks.push(
       googleNewsSignals(
@@ -373,7 +388,7 @@ export async function researchProspect(
         12,
         workplacePhrases
       ).then((s) => {
-        notes.push(`LinkedIn-workplace news (${phraseExtra}): ${s.length}`);
+        notes.push(`Workplace/domain news (${phraseExtra}): ${s.length}`);
         return s;
       }),
       googleNewsSignals(
@@ -385,7 +400,7 @@ export async function researchProspect(
         10,
         workplacePhrases
       ).then((s) => {
-        notes.push(`Person + LinkedIn workplace (${phraseExtra}): ${s.length}`);
+        notes.push(`Person + workplace/domain (${phraseExtra}): ${s.length}`);
         return s;
       })
     );
@@ -405,6 +420,10 @@ export async function researchProspect(
     else notes.push(`Source failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
   }
 
+  if (companySite) {
+    all.push(companyWebsiteAsSignal(companySite, input.company));
+  }
+
   const dedup = new Map<string, Signal>();
   for (const s of all) {
     const key = s.title
@@ -417,12 +436,12 @@ export async function researchProspect(
     else if ((s.publishedAt ?? "") > (prev.publishedAt ?? "")) dedup.set(key, s);
   }
 
-  const ranked = rankSignals([...dedup.values()], input, linkedIn);
+  const ranked = rankSignals([...dedup.values()], input, workplace);
   const kept = ranked.filter((s) => s.eligible).length;
   const dropped = ranked.filter((s) => !s.eligible && s.kind !== "company").length;
   const offerAligned = ranked.filter((s) => s.eligible && /offer fit:/i.test(s.why || "")).length;
   notes.push(
     `Soft-ranked ${ranked.length} → ${kept} candidates for LLM entity check (${offerAligned} offer-aligned), ${dropped} weak.`
   );
-  return { signals: ranked, notes, kept, dropped, linkedIn };
+  return { signals: ranked, notes, kept, dropped, linkedIn, companySite };
 }

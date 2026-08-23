@@ -1,5 +1,6 @@
 import type { ProspectInput } from "./types";
 import { companyAliases, distinctiveCompanyTokens, exactCompanyPhrase, wordMatch } from "./relevance";
+import { fetchHtml, metaContent } from "./scrape";
 
 export type LinkedInContext = {
   url: string;
@@ -101,7 +102,6 @@ export function extractEmployerHints(...blobs: (string | undefined)[]): string[]
     }
   }
 
-  // "Name - Company" / "Title | Company" (last segment only if it looks like an employer)
   const tail = text.split(/\s[-–—|·•]\s/).map((p) => p.trim()).filter(Boolean);
   if (tail.length >= 2) {
     const last = tail[tail.length - 1]!;
@@ -157,11 +157,9 @@ export function linkedInConfirmsCompany(
     const h = hint.toLowerCase().trim();
     if (!h) continue;
     if (aliases.some((a) => h === a || wordMatch(hint, a))) {
-      // "Cube Logistics" vs typed "Cube" — extra distinctive word ⇒ different org
       if (isConflictingEmployerHint(hint, company)) continue;
       return true;
     }
-    // Cube.dev / Cube AI (generic second token) vs Cube
     if (h.startsWith(`${companyPhrase}.`) || h === `${companyPhrase}.dev`) return true;
     if (tokens.some((t) => h === t || h.startsWith(`${t}.`))) return true;
   }
@@ -177,12 +175,14 @@ function isConflictingEmployerHint(hint: string, company: string): boolean {
   const brand = tokens[0]!;
   const lower = hint.toLowerCase().trim();
   if (lower === brand) return false;
-  if (lower.startsWith(`${brand}.`)) return false; // cube.dev
-  const m = lower.match(new RegExp(`^${brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+([a-z0-9][a-z0-9&'-]*)`));
+  if (lower.startsWith(`${brand}.`)) return false;
+  const m = lower.match(
+    new RegExp(`^${brand.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\s+([a-z0-9][a-z0-9&'-]*)`)
+  );
   if (!m) return false;
   const next = m[1]!;
   if (["dev", "io", "ai", "hq", "inc", "llc", "ltd", "corp", "co"].includes(next)) return false;
-  return true; // Cube Logistics, Cube Bikes, …
+  return true;
 }
 
 /** Extra search / match phrases from LinkedIn (domains + employer strings). */
@@ -198,38 +198,6 @@ export function linkedInCompanySearchPhrases(
     if (h.length >= 3 && h.length <= 48) out.push(h);
   }
   return unique(out).slice(0, 4);
-}
-
-async function fetchText(url: string, timeoutMs = 8000): Promise<string | null> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      cache: "no-store",
-      redirect: "follow",
-    });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-function metaContent(html: string, prop: string): string | undefined {
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`,
-    "i"
-  );
-  const m = html.match(re);
-  return (m?.[1] || m?.[2] || "").replace(/\s+/g, " ").trim() || undefined;
 }
 
 /**
@@ -251,7 +219,7 @@ export async function loadLinkedInContext(prospect: ProspectInput): Promise<Link
     note: "LinkedIn URL provided — using vanity/slug as identity hint.",
   };
 
-  const html = await fetchText(parsed.url);
+  const html = await fetchHtml(parsed.url, 10000);
   if (!html) {
     base.note = "LinkedIn page not fetchable (common). Vanity slug still used for matching.";
     return base;

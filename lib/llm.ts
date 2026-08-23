@@ -272,6 +272,7 @@ function packResearch(
       company: prospect.company,
       notes: prospect.notes || "",
       linkedinUrl: prospect.linkedinUrl || linkedIn?.url || "",
+      companyWebsite: prospect.companyWebsite || "",
     },
     linkedIn: linkedIn
       ? {
@@ -339,16 +340,17 @@ CRITICAL — multi-word company names:
 
 CRITICAL — same short name / ambiguous brands (e.g. typed company is just "Cube"):
 - Many unrelated orgs share names like Cube, Meta, Delta, Apex.
-- LinkedIn workplace is the source of truth for WHICH Cube. If LinkedIn shows employer/domain (e.g. Cube.dev, "Delivery Manager at Cube"), KEEP only stories about that workplace.
-- REJECT stories about other Cubes (Cube Logistics, Rubik, crypto tickers, etc.) that do not match the LinkedIn employer/domain.
-- If LinkedIn is missing and the company name is a single ambiguous token, prefer REJECT unless the article also names the person with that company.
+- LinkedIn workplace AND/OR company website domain are the source of truth for WHICH Cube.
+- If LinkedIn shows employer/domain (e.g. Cube.dev, "Delivery Manager at Cube") or the SDR provided companyWebsite (e.g. https://cube.dev), KEEP only stories about that workplace/domain.
+- REJECT stories about other Cubes (Cube Logistics, Rubik, crypto tickers, etc.) that do not match the LinkedIn employer or company website domain.
+- If both LinkedIn and company website are missing and the company name is a single ambiguous token, prefer REJECT unless the article also names the person with that company.
 
-Use LinkedIn vanity/headline/employerHints/domainHints when provided to confirm person + workplace.
+Use LinkedIn vanity/headline/employerHints/domainHints and companyWebsite when provided to confirm person + workplace.
 When unsure, REJECT.
 
 PERSON vs COMPANY:
 - A story about the person at a DIFFERENT employer (Jeff Bezos / Blue Origin while the target is Amazon) is a REJECT for outreach to the target company.
-- Person-only items that never name the target company (or LinkedIn workplace alias) are REJECT.
+- Person-only items that never name the target company (or LinkedIn / website workplace alias) are REJECT.
 
 HOOK CHOICE — you are helping an SDR sell: "${prospect.senderOffer?.trim() || "their product"}"
 - chosenHookId must be a confirmed match AND the best bridge to that offer (themes, pain, timing).
@@ -358,8 +360,9 @@ HOOK CHOICE — you are helping an SDR sell: "${prospect.senderOffer?.trim() || 
   const user = `TARGET PERSON: ${prospect.fullName}
 TARGET TITLE: ${prospect.title}
 TARGET COMPANY (typed by SDR): "${prospect.company}"
-${isAmbiguousCompanyName(prospect.company) ? `NOTE: "${prospect.company}" is an AMBIGUOUS short name — rely on LinkedIn workplace to disambiguate.\n` : ""}WHAT THE SDR SELLS (use this to pick the best hook): "${prospect.senderOffer?.trim() || "unspecified product"}"
-LINKEDIN: ${JSON.stringify(
+${isAmbiguousCompanyName(prospect.company) ? `NOTE: "${prospect.company}" is an AMBIGUOUS short name — rely on LinkedIn workplace and/or company website domain to disambiguate.\n` : ""}COMPANY WEBSITE (SDR-provided): ${prospect.companyWebsite?.trim() || "none"}
+WHAT THE SDR SELLS (use this to pick the best hook): "${prospect.senderOffer?.trim() || "unspecified product"}"
+WORKPLACE CONTEXT (LinkedIn + website scrape): ${JSON.stringify(
     linkedIn
       ? {
           url: linkedIn.url,
@@ -372,7 +375,7 @@ LINKEDIN: ${JSON.stringify(
           employerMatchesCompany: linkedIn.employerMatchesCompany,
           note: linkedIn.note,
         }
-      : { url: prospect.linkedinUrl || null, employerMatchesCompany: null }
+      : { url: prospect.linkedinUrl || prospect.companyWebsite || null, employerMatchesCompany: null }
   )}
 SDR NOTES: ${prospect.notes || "none"}
 
@@ -394,16 +397,16 @@ Return JSON:
 {
   "matchedIds": ["id", "..."],
   "chosenHookId": "best single id for outreach or null",
-  "note": "1 sentence on entity match AND why this hook fits the offer (mention LinkedIn workplace if used)",
+  "note": "1 sentence on entity match AND why this hook fits the offer (mention LinkedIn / website domain if used)",
   "rejected": [{"id":"...","reason":"wrong company / unrelated person / ..."}]
 }
 
 Rules:
-- matchedIds = ONLY items about THIS exact company (or LinkedIn-confirmed workplace alias) OR THIS person in relation to this company
+- matchedIds = ONLY items about THIS exact company (or LinkedIn/website-confirmed workplace alias) OR THIS person in relation to this company
 - Prefer rejecting lookalikes over false positives
 - chosenHookId must be in matchedIds (or null if none)
 - chosenHookId should be the strongest outreach hook for selling "${prospect.senderOffer?.trim() || "the offer"}" to this person
-- If nothing clearly matches "${prospect.company}" (via name or LinkedIn workplace), return matchedIds: [] and chosenHookId: null`;
+- If nothing clearly matches "${prospect.company}" (via name, LinkedIn workplace, or company website domain), return matchedIds: [] and chosenHookId: null`;
 
   let raw = await llmChat(system, user, 0.1);
   if (!raw) {
@@ -480,7 +483,7 @@ export function applyEntityResolution(
       return {
         ...s,
         eligible: false,
-        why: `Safety net: missing exact "${phrase}"${ambiguous ? " / LinkedIn workplace" : ""} — lookalike or person/other-employer, not a sendable hook.`,
+        why: `Safety net: missing exact "${phrase}"${ambiguous ? " / workplace domain" : ""} — lookalike or person/other-employer, not a sendable hook.`,
         relevance: Math.min(s.relevance, 0.15),
       };
     }
@@ -496,7 +499,7 @@ export function applyEntityResolution(
       return {
         ...s,
         eligible: false,
-        why: `Safety net: ambiguous "${phrase}" without LinkedIn workplace confirmation in the article.`,
+        why: `Safety net: ambiguous "${phrase}" without workplace/domain confirmation in the article.`,
         relevance: Math.min(s.relevance, 0.15),
       };
     }
@@ -506,7 +509,7 @@ export function applyEntityResolution(
         ...s,
         eligible: true,
         why: hasWorkplace
-          ? `LLM confirmed entity match (LinkedIn workplace). ${s.why}`
+          ? `LLM confirmed entity match (workplace / domain). ${s.why}`
           : `LLM confirmed entity match. ${s.why}`,
         relevance: Math.min(0.99, Math.max(s.relevance, hasWorkplace ? 0.62 : 0.55)),
       };
@@ -883,7 +886,7 @@ Kind: ${hook.kind}
 ANALYSIS (hints only — rewrite into second-person email copy; discard any third-person "likely oversees" language):
 ${JSON.stringify(analysis, null, 2)}
 
-LinkedIn (identity only): ${linkedIn?.headline || linkedIn?.vanity || prospect.linkedinUrl || "none"}
+LinkedIn / website: ${linkedIn?.headline || linkedIn?.vanity || prospect.linkedinUrl || prospect.companyWebsite || "none"}
 
 BAD (never produce this style):
 "Hi Colin,

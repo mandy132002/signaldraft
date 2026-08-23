@@ -7,6 +7,15 @@ const ALIASES: Record<keyof ProspectInput, string[]> = {
   title: ["title", "jobtitle", "role", "position"],
   company: ["company", "companyname", "org", "organization", "account"],
   linkedinUrl: ["linkedinurl", "linkedin", "linkedinprofile", "profileurl"],
+  companyWebsite: [
+    "companywebsite",
+    "website",
+    "companyurl",
+    "companysite",
+    "site",
+    "homepage",
+    "domain",
+  ],
   notes: ["notes", "note", "context", "trigger"],
   senderName: ["sendername", "sdr", "fromname", "yourname"],
   senderCompany: ["sendercompany", "sdrcompany", "fromcompany", "yourcompany"],
@@ -127,6 +136,7 @@ export function prospectsFromCsv(
       title: get("title"),
       company,
       linkedinUrl: get("linkedinUrl") || undefined,
+      companyWebsite: get("companyWebsite") || undefined,
       notes: get("notes") || undefined,
       senderName: get("senderName") || defaults.senderName,
       senderCompany: get("senderCompany") || defaults.senderCompany,
@@ -137,9 +147,9 @@ export function prospectsFromCsv(
   return { prospects, errors, matchedColumns };
 }
 
-export const CSV_TEMPLATE = `fullName,title,company,linkedinUrl,notes
-Jeff Bezos,Executive Chairman,Amazon,,
-Satya Nadella,CEO,Microsoft,,
+export const CSV_TEMPLATE = `fullName,title,company,linkedinUrl,companyWebsite,notes
+Jeff Bezos,Executive Chairman,Amazon,,https://www.amazon.com,
+Satya Nadella,CEO,Microsoft,,https://www.microsoft.com,
 `;
 
 export const MAX_BULK_ROWS = MAX_ROWS;

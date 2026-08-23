@@ -1,4 +1,5 @@
 import { resolveAndAnalyze, llmModelName, writeDraft } from "./draft";
+import { mergeWorkplaceContext } from "./company-site";
 import { upsertRun } from "./db";
 import { researchProspect } from "./research";
 import type { ProspectInput, RunRecord, StageEvent } from "./types";
@@ -16,7 +17,7 @@ function newId() {
 function stages(): StageEvent[] {
   const labels = [
     ["intake", "Intake prospect"],
-    ["company", "Company + LinkedIn context"],
+    ["company", "Company + LinkedIn / website"],
     ["news", "Public news & funding"],
     ["hiring", "Person + company signals"],
     ["rank", "Soft-rank candidates"],
@@ -84,16 +85,22 @@ export async function executeRun(
       run,
       "intake",
       "done",
-      `Researching ${prospect.fullName} at ${prospect.company}${prospect.linkedinUrl ? " (+ LinkedIn workplace)" : ""}. Soft name recall; LLM confirms entity.`
+      `Researching ${prospect.fullName} at ${prospect.company}${
+        prospect.linkedinUrl || prospect.companyWebsite
+          ? ` (+ ${[prospect.linkedinUrl && "LinkedIn", prospect.companyWebsite && "website"].filter(Boolean).join(" + ")})`
+          : ""
+      }. Soft name recall; LLM confirms entity.`
     );
     onUpdate(run);
 
-    setStage(run, "company", "running", `Wikipedia + LinkedIn context for "${prospect.company}".`);
+    setStage(run, "company", "running", `Wikipedia + LinkedIn / company website for "${prospect.company}".`);
     setStage(run, "news", "running", `News search (quoted + soft tokens).`);
-    setStage(run, "hiring", "running", `Person / LinkedIn-slug signals.`);
+    setStage(run, "hiring", "running", `Person / workplace signals.`);
     onUpdate(run);
 
-    const { signals: softRanked, notes, kept, dropped, linkedIn } = await researchProspect(prospect);
+    const { signals: softRanked, notes, kept, dropped, linkedIn, companySite } =
+      await researchProspect(prospect);
+    const workplace = mergeWorkplaceContext(linkedIn, companySite);
 
     const wiki = softRanked.find((s) => s.kind === "company");
     setStage(
@@ -101,8 +108,9 @@ export async function executeRun(
       "company",
       "done",
       [
-        wiki ? wiki.title : "No Wikipedia page.",
-        linkedIn ? `LinkedIn: ${linkedIn.vanity || linkedIn.url}` : "No LinkedIn URL.",
+        wiki ? wiki.title : "No Wikipedia / site page.",
+        linkedIn ? `LinkedIn: ${linkedIn.vanity || linkedIn.url}` : "No LinkedIn.",
+        companySite ? `Site: ${companySite.host}` : "No company website.",
       ].join(" · ")
     );
     setStage(
@@ -126,7 +134,7 @@ export async function executeRun(
       run,
       "rank",
       "done",
-      `${kept} candidates for LLM entity check (${dropped} too weak). ${notes.filter((n) => n.startsWith("LinkedIn")).join(" ") || ""}`
+      `${kept} candidates for LLM entity check (${dropped} too weak). ${notes.filter((n) => n.startsWith("LinkedIn") || n.startsWith("Company website")).join(" ") || ""}`
     );
     onUpdate(run);
 
@@ -141,7 +149,7 @@ export async function executeRun(
     const { signals, hook, analysis, llm, entityNote } = await resolveAndAnalyze(
       prospect,
       softRanked,
-      linkedIn
+      workplace
     );
     run.signals = signals.filter((s) => s.eligible || s.kind === "company" || s.matchTier === "suspect");
     run.chosenSignal = hook;
@@ -192,10 +200,15 @@ export async function executeRun(
       llm ? `Drafting with ${llmModelName()}…` : "Writing draft (heuristic)."
     );
     onUpdate(run);
-    run.draft = await writeDraft(prospect, signals, analysis, linkedIn);
+    run.draft = await writeDraft(prospect, signals, analysis, workplace);
     if (run.draft.hold) {
       setStage(run, "draft", "done", `HOLD — no confirmed hook · ${run.draft.holdReason || "do not send"}`);
-      setStage(run, "review", "done", "No sendable email. Store the hold or add a LinkedIn URL and run again.");
+      setStage(
+        run,
+        "review",
+        "done",
+        "No sendable email. Store the hold or add LinkedIn / company website and run again."
+      );
     } else if (run.draft.sensitiveHook) {
       setStage(run, "draft", "done", `Ready for careful review · sensitive hook · ${run.draft.confidence}`);
       setStage(run, "review", "done", "Sensitive public event. Do not congratulate. Nothing is auto-sent.");

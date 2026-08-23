@@ -12,6 +12,7 @@ export const defaultProspect: ProspectInput = {
   title: "Executive Chairman",
   company: "Amazon",
   linkedinUrl: "",
+  companyWebsite: "",
   notes: "",
   senderName: "Mandar",
   senderCompany: "Acme",

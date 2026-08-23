@@ -44,6 +44,8 @@ export type ProspectInput = {
   title: string;
   company: string;
   linkedinUrl?: string;
+  /** Public company homepage — used to scrape context and disambiguate same-name orgs */
+  companyWebsite?: string;
   notes?: string;
   senderName?: string;
   senderCompany?: string;

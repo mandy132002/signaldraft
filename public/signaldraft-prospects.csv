@@ -1,3 +1,3 @@
-fullName,title,company,linkedinUrl,notes
-Jeff Bezos,Executive Chairman,Amazon,,
-Satya Nadella,CEO,Microsoft,,
+fullName,title,company,linkedinUrl,companyWebsite,notes
+Jeff Bezos,Executive Chairman,Amazon,,https://www.amazon.com,
+Satya Nadella,CEO,Microsoft,,https://www.microsoft.com,
