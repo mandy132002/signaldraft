@@ -303,7 +303,7 @@ export default function HomePage() {
               <input value={form.company} onChange={set("company")} required placeholder="Amazon" />
             </div>
           </div>
-          <label>LinkedIn URL {form.company.trim().split(/\s+/).length <= 1 ? "(recommended for short names like Cube)" : "(optional)"}</label>
+          <label>LinkedIn URL {form.company.trim().split(/\s+/).length <= 1 ? "(recommended)" : "(optional)"}</label>
           <input
             value={form.linkedinUrl}
             onChange={set("linkedinUrl")}
@@ -315,12 +315,6 @@ export default function HomePage() {
             onChange={set("companyWebsite")}
             placeholder="https://cube.dev — scraped for context + news search"
           />
-          {form.company.trim().split(/\s+/).filter(Boolean).length === 1 ? (
-            <p className="hint" style={{ marginTop: 6 }}>
-              Short company names collide often (Cube, Meta, Delta). Paste LinkedIn and/or the company website so we
-              pick the right org — or use a precise name (e.g. Cube.dev / Cube Global).
-            </p>
-          ) : null}
           <label>You (SDR) — name / your company</label>
           <div className="row2">
             <input value={form.senderName} onChange={set("senderName")} placeholder="Your name" />

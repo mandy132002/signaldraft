@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Shell } from "../shell";
-import { ClaudeSpark } from "../ClaudeSpark";
+import { BrandMark } from "../BrandMark";
 
 export default function LoginPage() {
   const { status } = useSession();
@@ -19,7 +19,7 @@ export default function LoginPage() {
       <div className="login-screen">
         <div className="login-panel">
           <div className="login-mark" aria-hidden>
-            <ClaudeSpark size={28} className="dark" />
+            <BrandMark size={52} />
           </div>
           <h1 className="login-title">
             Signal<span>Draft</span>

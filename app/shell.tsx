@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthMenu } from "./AuthMenu";
+import { BrandMark } from "./BrandMark";
 import { ClaudeSpark } from "./ClaudeSpark";
 
 export function Shell({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
@@ -11,6 +12,7 @@ export function Shell({ children, bare = false }: { children: React.ReactNode; b
     <div className="app-shell">
       <header className="topbar">
         <Link href={bare ? "/login" : "/"} className="brand" aria-label="SignalDraft home">
+          <BrandMark size={26} />
           Signal<span>Draft</span>
         </Link>
         {bare ? (

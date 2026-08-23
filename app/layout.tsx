@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SignalDraft — prospect to outreach",
   description: "Live automated research and personalized outreach drafts, held for human review.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
