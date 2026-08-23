@@ -125,6 +125,13 @@ export default function HistoryClient() {
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, safePage]);
 
+  const selectedIndex = useMemo(
+    () => (open ? filtered.findIndex((r) => r.id === open) : -1),
+    [filtered, open]
+  );
+  const canPrev = selectedIndex > 0;
+  const canNext = selectedIndex >= 0 && selectedIndex < filtered.length - 1;
+
   useEffect(() => {
     setPage(1);
   }, [q, timeFrame, confidenceFilter]);
@@ -153,7 +160,7 @@ export default function HistoryClient() {
   }
 
   async function saveEdits() {
-    if (!selected?.draft || !dirty) return;
+    if (!selected?.draft || !dirty) return true;
     setSaving(true);
     try {
       const res = await fetch(`/api/runs/${selected.id}`, {
@@ -168,12 +175,13 @@ export default function HistoryClient() {
       const json = await res.json();
       if (!res.ok) {
         setSaveMsg(json.error || "Save failed");
-        return;
+        return false;
       }
       setRuns((prev) => prev.map((r) => (r.id === json.run.id ? json.run : r)));
       applyServerDraft(selected.id, editSubject, editBody);
       setSaveMsg("Saved");
       window.setTimeout(() => setSaveMsg(null), 1600);
+      return true;
     } finally {
       setSaving(false);
     }
@@ -206,6 +214,49 @@ export default function HistoryClient() {
     }
   }
 
+  async function goAdjacent(delta: number) {
+    if (selectedIndex < 0 || saving || refining) return;
+    const next = filtered[selectedIndex + delta];
+    if (!next) return;
+    if (dirty) {
+      const saved = await saveEdits();
+      if (!saved) return;
+    }
+    setOpen(next.id);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      const typing =
+        e.target instanceof HTMLElement &&
+        (e.target.tagName === "INPUT" ||
+          e.target.tagName === "TEXTAREA" ||
+          e.target.tagName === "SELECT");
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(null);
+        return;
+      }
+      if (typing || saving || refining) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        void goAdjacent(-1);
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        void goAdjacent(1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, selectedIndex, filtered, dirty, editSubject, editBody, saving, refining]);
+
   return (
     <Shell wide>
       <div style={{ marginBottom: 24 }}>
@@ -233,7 +284,7 @@ export default function HistoryClient() {
           Saved outreach
         </h1>
         <p className="lede" style={{ marginBottom: 0 }}>
-          Open a run to review its email. Approve or reject items still in review. Edit and save anytime.
+          Open a run to review its email. Click a row to open it, then use Previous / Next to move through the list.
         </p>
       </div>
       <div className="kpis" aria-busy={loading}>
@@ -328,6 +379,11 @@ export default function HistoryClient() {
               </span>
             ) : null}
           </h2>
+          {!loading ? (
+            <p className="hint" style={{ marginTop: -8 }}>
+              Click a row to open the email. Previous / Next in the preview moves through the current list.
+            </p>
+          ) : null}
           {loading ? (
             <div className="dashboard-loading" aria-live="polite">
               <ClaudeSpark size={22} />
@@ -342,6 +398,7 @@ export default function HistoryClient() {
                     <th>When</th>
                     <th>Prospect</th>
                     <th>Status</th>
+                    <th>Confidence</th>
                     <th>Email subject</th>
                   </tr>
                 </thead>
@@ -352,7 +409,7 @@ export default function HistoryClient() {
                     <tr
                       className={`clickable ${r.id === open ? "selected-row" : ""}`}
                       key={r.id}
-                      onClick={() => setOpen(r.id === open ? null : r.id)}
+                      onClick={() => setOpen(r.id)}
                     >
                       <td>
                         <span className="run-when">
@@ -368,22 +425,24 @@ export default function HistoryClient() {
                       </td>
                       <td>
                         <div className="run-status">
-                          <span className="run-status-badges">
-                            <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
-                            {r.draft?.hold || (r.draft && isHoldDraft(r.draft)) ? (
-                              <span className="badge hold">Hold</span>
-                            ) : r.draft?.confidence ? (
-                              <span className={`badge confidence-${r.draft.confidence}`}>
-                                {r.draft.confidence}
-                              </span>
-                            ) : null}
-                          </span>
+                          <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
                           {r.status === "approved" || r.status === "rejected" ? (
                             <span className="run-status-note ok">email stored</span>
                           ) : r.draft?.body ? (
                             <span className="run-status-note">awaiting decision</span>
                           ) : null}
                         </div>
+                      </td>
+                      <td>
+                        {r.draft?.hold || (r.draft && isHoldDraft(r.draft)) ? (
+                          <span className="badge hold">Hold</span>
+                        ) : r.draft?.confidence ? (
+                          <span className={`badge confidence-${r.draft.confidence}`}>
+                            {r.draft.confidence}
+                          </span>
+                        ) : (
+                          <span className="run-status-note">—</span>
+                        )}
                       </td>
                       <td>
                         <span className="run-subject" title={r.draft?.subject ?? r.error ?? undefined}>
@@ -395,7 +454,7 @@ export default function HistoryClient() {
                   })}
                   {!filtered.length ? (
                     <tr>
-                      <td colSpan={4} style={{ color: "var(--muted)" }}>
+                      <td colSpan={5} style={{ color: "var(--muted)" }}>
                         {runs.length
                           ? filtersActive
                             ? "No runs match your filters."
@@ -441,26 +500,62 @@ export default function HistoryClient() {
             </>
           )}
         </div>
+      </div>
 
-        <div className="card stored-email" id="stored-email">
-          <h2>
-            Stored email {saveMsg ? <span className="badge needs_review">{saveMsg}</span> : null}
-          </h2>
-          {loading ? (
-            <div className="dashboard-loading" aria-live="polite">
-              <ClaudeSpark size={22} />
-              <p>Loading email…</p>
-            </div>
-          ) : !selected ? (
-            <p className="hint" style={{ marginTop: 0 }}>
-              Select a run on the left. Approve or reject on Live run to store the final email.
-            </p>
-          ) : !selected.draft ? (
-            <p className="hint" style={{ marginTop: 0 }}>
-              This run has no email draft (likely no confirmed hook).
-            </p>
-          ) : (
-            <>
+      {selected ? (
+        <div
+          className="email-modal-backdrop"
+          onClick={() => setOpen(null)}
+          role="presentation"
+        >
+          <div
+            className="email-modal stored-email"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="email-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="email-modal-head">
+              <div>
+                <h2 id="email-modal-title">
+                  Stored email {saveMsg ? <span className="badge needs_review">{saveMsg}</span> : null}
+                </h2>
+                <p className="email-modal-sub">
+                  {selected.prospect.fullName} · {selected.prospect.company}
+                </p>
+              </div>
+              <div className="email-modal-nav">
+                <button
+                  type="button"
+                  className="btn ghost pagination-btn"
+                  disabled={!canPrev || saving || refining}
+                  onClick={() => void goAdjacent(-1)}
+                >
+                  Previous
+                </button>
+                <span className="email-modal-count" aria-live="polite">
+                  {selectedIndex >= 0 ? `${selectedIndex + 1} of ${filtered.length}` : "—"}
+                </span>
+                <button
+                  type="button"
+                  className="btn ghost pagination-btn"
+                  disabled={!canNext || saving || refining}
+                  onClick={() => void goAdjacent(1)}
+                >
+                  Next
+                </button>
+                <button type="button" className="btn ghost pagination-btn" onClick={() => setOpen(null)}>
+                  Close
+                </button>
+              </div>
+            </header>
+
+            {!selected.draft ? (
+              <p className="hint" style={{ marginTop: 0 }}>
+                This run has no email draft (likely no confirmed hook).
+              </p>
+            ) : (
+              <>
               {isHoldDraft(selected.draft) ? (
                 <div className="callout hold">
                   <strong>Hold — do not send.</strong> No confirmed public hook for {selected.prospect.fullName} at{" "}
@@ -601,10 +696,11 @@ export default function HistoryClient() {
                   </ul>
                 </div>
               ) : null}
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </Shell>
   );
 }
