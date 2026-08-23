@@ -5,6 +5,7 @@ import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { StageEvent } from "@/lib/types";
 import { ClaudeSpark } from "./ClaudeSpark";
 import { GmailDraftButton } from "./GmailDraftButton";
+import { RefineEmailBox } from "./RefineEmailBox";
 import { useLiveSession } from "./LiveSession";
 import { Shell } from "./shell";
 
@@ -72,10 +73,7 @@ export default function HomePage() {
   } = useLiveSession();
 
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [showRefine, setShowRefine] = useState(false);
-  const [refinePrompt, setRefinePrompt] = useState("");
   const [refining, setRefining] = useState(false);
-  const [refineError, setRefineError] = useState<string | null>(null);
   const [signalsOpen, setSignalsOpen] = useState(false);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -164,39 +162,6 @@ export default function HomePage() {
     });
     const json = await res.json();
     setRun(json.run);
-  }
-
-  async function refineEmail() {
-    if (!run || !refinePrompt.trim() || refining) return;
-    setRefining(true);
-    setRefineError(null);
-    try {
-      const res = await fetch(`/api/runs/${run.id}/refine`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          prompt: refinePrompt.trim(),
-          subject,
-          emailBody: body,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setRefineError(json.error || "Refine failed");
-        return;
-      }
-      setRun(json.run);
-      if (json.run?.draft) {
-        setSubject(json.run.draft.subject);
-        setBody(json.run.draft.body);
-      }
-      setShowRefine(false);
-      setRefinePrompt("");
-    } catch (e) {
-      setRefineError(e instanceof Error ? e.message : "Refine failed");
-    } finally {
-      setRefining(false);
-    }
   }
 
   const chosenId = run?.chosenSignal?.id;
@@ -529,68 +494,19 @@ export default function HomePage() {
               />
 
               {run?.chosenSignal && !(run.draft && isHoldDraft(run.draft)) ? (
-                <div className="refine-box">
-                  {!showRefine ? (
-                    <button
-                      className="btn ghost"
-                      type="button"
-                      disabled={busy || refining}
-                      style={{ marginTop: 12 }}
-                      onClick={() => {
-                        setShowRefine(true);
-                        setRefineError(null);
-                      }}
-                    >
-                      Refine
-                    </button>
-                  ) : (
-                    <>
-                      <label>Refinement prompt</label>
-                      <textarea
-                        value={refinePrompt}
-                        onChange={(e) => setRefinePrompt(e.target.value)}
-                        disabled={refining}
-                        placeholder="e.g. Make it shorter and more formal. Emphasize cost savings for retail ops. Soft CTA — ask if next Tuesday works."
-                        style={{ minHeight: 88 }}
-                      />
-                      <div className="actions">
-                        <button
-                          className="btn ok"
-                          type="button"
-                          disabled={refining || !refinePrompt.trim()}
-                          onClick={() => void refineEmail()}
-                        >
-                          <span className="btn-inner">
-                            {refining ? <ClaudeSpark size={16} className="dark" /> : null}
-                            {refining ? "Refining…" : "Generate refined email"}
-                          </span>
-                        </button>
-                        <button
-                          className="btn ghost"
-                          type="button"
-                          disabled={refining}
-                          onClick={() => {
-                            setShowRefine(false);
-                            setRefinePrompt("");
-                            setRefineError(null);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {refineError ? (
-                        <p className="hint" style={{ color: "var(--bad)" }}>
-                          {refineError}
-                        </p>
-                      ) : (
-                        <p className="hint">
-                          AI rewrites the email using your instructions plus the research hook and analysis.
-                          Does not invent personal history.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
+                <RefineEmailBox
+                  runId={run.id}
+                  subject={subject}
+                  body={body}
+                  enabled
+                  disabled={busy}
+                  onRefiningChange={setRefining}
+                  onRefined={({ subject: s, body: b, run: updated }) => {
+                    setRun(updated);
+                    setSubject(s);
+                    setBody(b);
+                  }}
+                />
               ) : null}
 
               {run ? (

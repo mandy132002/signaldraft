@@ -793,8 +793,132 @@ tr.selected-row:hover { background: var(--copper-soft); }
 
 .refine-box {
   margin-top: 12px;
-  padding-top: 12px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.refine-box.is-open {
+  margin-top: 14px;
+  padding: 16px;
+  border-top: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(201, 100, 66, 0.22);
+  background:
+    linear-gradient(165deg, rgba(255, 249, 245, 0.98) 0%, rgba(255, 255, 255, 0.92) 55%, rgba(245, 240, 255, 0.5) 100%);
+  box-shadow: 0 0 0 3px var(--copper-soft), var(--shadow-sm);
+}
+
+.btn-ai-refine {
+  margin-top: 0;
+  width: auto;
+  position: relative;
+  overflow: hidden;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--card-solid), var(--card-solid)) padding-box,
+    linear-gradient(
+      120deg,
+      rgba(201, 100, 66, 0.9),
+      rgba(147, 112, 219, 0.45),
+      rgba(61, 122, 92, 0.35),
+      rgba(201, 100, 66, 0.75)
+    )
+    border-box;
+  color: var(--ink);
+  font-weight: 650;
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.1), var(--shadow-sm);
+}
+.btn-ai-refine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: ai-shimmer 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.btn-ai-refine:hover:not(:disabled) {
+  background:
+    linear-gradient(#fff9f5, #fff9f5) padding-box,
+    linear-gradient(
+      120deg,
+      var(--copper),
+      rgba(147, 112, 219, 0.55),
+      rgba(61, 122, 92, 0.4),
+      var(--copper-2)
+    )
+    border-box;
+  color: var(--ink);
+  box-shadow: 0 0 0 4px var(--copper-soft), 0 10px 28px rgba(201, 100, 66, 0.14);
+}
+.btn-ai-refine:disabled {
+  opacity: 0.55;
+}
+
+.btn-ai-generate {
+  background: linear-gradient(135deg, #4a8f6c 0%, var(--copper) 52%, #8b6fd4 100%);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.12), var(--shadow-sm);
+}
+.btn-ai-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #428a68 0%, var(--copper-2) 52%, #7a5fc4 100%);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--copper-soft), 0 10px 28px rgba(201, 100, 66, 0.18);
+}
+.btn-ai-generate .claude-spark-arm {
+  fill: #fffaf6;
+}
+
+.ai-refine-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(201, 100, 66, 0.14), rgba(147, 112, 219, 0.1));
+  color: var(--copper-2);
+  border: 1px solid rgba(201, 100, 66, 0.22);
+  line-height: 1.3;
+}
+
+.refine-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.refine-panel-title {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.refine-prompt {
+  min-height: 88px;
+  border-color: rgba(201, 100, 66, 0.22);
+  background: rgba(255, 255, 255, 0.88);
+}
+.refine-prompt:focus {
+  border-color: rgba(201, 100, 66, 0.45);
+  box-shadow: 0 0 0 3px var(--copper-soft);
+}
+
+@keyframes ai-shimmer {
+  0%, 72%, 100% { transform: translateX(-120%); }
+  40% { transform: translateX(120%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-ai-refine::before {
+    animation: none;
+    display: none;
+  }
 }
 
 .collapse-toggle {
@@ -902,14 +1026,15 @@ tr.selected-row td { border-bottom-color: rgba(201, 100, 66, 0.35); }
   margin: 0;
 }
 .bulk-drop-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-width: 420px;
+  margin: 0 auto;
 }
 .bulk-file-btn {
   margin-top: 0;
-  width: auto;
+  width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -917,7 +1042,7 @@ tr.selected-row td { border-bottom-color: rgba(201, 100, 66, 0.35); }
 }
 .bulk-drop .btn.ghost {
   margin-top: 0;
-  width: auto;
+  width: 100%;
 }
 .bulk-paste {
   min-height: 120px;

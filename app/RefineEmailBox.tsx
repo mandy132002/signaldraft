@@ -66,39 +66,47 @@ export function RefineEmailBox({
   }
 
   return (
-    <div className="refine-box">
+    <div className={`refine-box ${showRefine ? "is-open" : ""}`}>
       {!showRefine ? (
         <button
-          className="btn ghost"
+          className="btn btn-ai-refine"
           type="button"
           disabled={disabled || refining}
-          style={{ marginTop: 12 }}
           onClick={() => {
             setShowRefine(true);
             setRefineError(null);
           }}
         >
-          Refine
+          <span className="btn-inner">
+            <ClaudeSpark size={18} />
+            <span>Refine with AI</span>
+            <span className="ai-refine-badge">Groq</span>
+          </span>
         </button>
       ) : (
         <>
-          <label>Refinement prompt</label>
+          <div className="refine-panel-head">
+            <ClaudeSpark size={18} />
+            <span className="refine-panel-title">AI refinement</span>
+            <span className="ai-refine-badge">Groq</span>
+          </div>
+          <label>What should change?</label>
           <textarea
+            className="refine-prompt"
             value={refinePrompt}
             onChange={(e) => setRefinePrompt(e.target.value)}
             disabled={refining || disabled}
             placeholder="e.g. Make it shorter and more formal. Emphasize cost savings for retail ops. Soft CTA — ask if next Tuesday works."
-            style={{ minHeight: 88 }}
           />
           <div className="actions">
             <button
-              className="btn ok"
+              className="btn btn-ai-generate"
               type="button"
               disabled={refining || disabled || !refinePrompt.trim()}
               onClick={() => void refineEmail()}
             >
               <span className="btn-inner">
-                {refining ? <ClaudeSpark size={16} className="dark" /> : null}
+                {refining ? <ClaudeSpark size={16} className="dark" /> : <ClaudeSpark size={16} className="dark" />}
                 {refining ? "Refining…" : "Generate refined email"}
               </span>
             </button>
