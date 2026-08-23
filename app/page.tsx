@@ -303,8 +303,18 @@ export default function HomePage() {
               <input value={form.company} onChange={set("company")} required placeholder="Amazon" />
             </div>
           </div>
-          <label>LinkedIn URL (optional)</label>
-          <input value={form.linkedinUrl} onChange={set("linkedinUrl")} placeholder="https://linkedin.com/in/…" />
+          <label>LinkedIn URL {form.company.trim().split(/\s+/).length <= 1 ? "(recommended for short names like Cube)" : "(optional)"}</label>
+          <input
+            value={form.linkedinUrl}
+            onChange={set("linkedinUrl")}
+            placeholder="https://linkedin.com/in/… — used to confirm which company they work at"
+          />
+          {form.company.trim().split(/\s+/).filter(Boolean).length === 1 ? (
+            <p className="hint" style={{ marginTop: 6 }}>
+              Short company names collide often (Cube, Meta, Delta). Paste the prospect’s LinkedIn so we pick the workplace
+              that matches their profile — or use a precise name (e.g. Cube.dev / Cube Global).
+            </p>
+          ) : null}
           <label>You (SDR) — name / your company</label>
           <div className="row2">
             <input value={form.senderName} onChange={set("senderName")} placeholder="Your name" />

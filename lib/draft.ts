@@ -10,7 +10,7 @@ import {
 } from "./llm";
 import type { LinkedInContext } from "./linkedin";
 import { offerFit } from "./offer";
-import { mentionsCompanyExact, pickHook, type RankedSignal } from "./relevance";
+import { isAmbiguousCompanyName, mentionsCompanyExact, pickHook, type RankedSignal } from "./relevance";
 import type { OutreachDraft, ProspectInput, Signal } from "./types";
 
 export type { HookAnalysis };
@@ -48,22 +48,38 @@ function subjectFromHook(prospect: ProspectInput, hook: Signal): string {
   return `Quick note — ${prospect.company}`;
 }
 
-function isSafeSendableHook(signal: Signal, prospect: ProspectInput): boolean {
+function isSafeSendableHook(
+  signal: Signal,
+  prospect: ProspectInput,
+  linkedIn?: LinkedInContext | null
+): boolean {
   if (!signal.eligible || signal.kind === "company") return false;
-  return mentionsCompanyExact(`${signal.title} ${signal.summary}`, prospect.company);
+  const text = `${signal.title} ${signal.summary}`;
+  if (mentionsCompanyExact(text, prospect.company)) return true;
+  // Ambiguous "Cube" + LinkedIn says cube.dev — allow workplace alias in the hook text
+  if (
+    isAmbiguousCompanyName(prospect.company) &&
+    linkedIn?.employerMatchesCompany &&
+    (linkedIn.employerHints.some((h) => text.toLowerCase().includes(h.toLowerCase())) ||
+      linkedIn.domainHints.some((d) => text.toLowerCase().includes(d.toLowerCase())))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** Merge LLM entity choice with offer-aware ranking. */
 function selectHook(
   signals: Signal[],
   prospect: ProspectInput,
-  preferredId?: string | null
+  preferredId?: string | null,
+  linkedIn?: LinkedInContext | null
 ): Signal | undefined {
   const ranked = signals as RankedSignal[];
   const preferred = preferredId
-    ? ranked.find((s) => s.id === preferredId && isSafeSendableHook(s, prospect))
+    ? ranked.find((s) => s.id === preferredId && isSafeSendableHook(s, prospect, linkedIn))
     : undefined;
-  const best = pickHook(ranked, prospect);
+  const best = pickHook(ranked, prospect, linkedIn);
   if (!preferred) return best;
   if (!best || preferred.id === best.id) return preferred;
 
@@ -182,7 +198,7 @@ export async function resolveAndAnalyze(
   if (up) {
     const resolution = await resolveEntities(prospect, ranked, linkedIn);
     if (resolution) {
-      signals = applyEntityResolution(ranked, resolution, prospect);
+      signals = applyEntityResolution(ranked, resolution, prospect, linkedIn);
       entityNote = resolution.note;
       preferredHookId = resolution.chosenHookId;
       if (resolution.chosenHookId) {
@@ -228,9 +244,16 @@ export async function resolveAndAnalyze(
     });
   }
 
-  const hook = selectHook(signals, prospect, preferredHookId);
+  const hook = selectHook(signals, prospect, preferredHookId, linkedIn);
   if (hook && preferredHookId && hook.id !== preferredHookId) {
     entityNote = `${entityNote} · Hook switched to offer-aligned signal.`;
+  }
+  if (
+    !hook &&
+    isAmbiguousCompanyName(prospect.company) &&
+    linkedIn?.employerMatchesCompany !== true
+  ) {
+    entityNote = `${entityNote} · Ambiguous company "${prospect.company}" — add LinkedIn so we can confirm the workplace.`;
   }
   if (!hook) return { signals, hook: undefined, analysis: null, llm: up, entityNote };
 
@@ -246,7 +269,7 @@ export async function writeDraft(
   analysis?: HookAnalysis | null,
   linkedIn?: LinkedInContext | null
 ): Promise<OutreachDraft> {
-  const hook = pickHook(ranked as RankedSignal[], prospect);
+  const hook = pickHook(ranked as RankedSignal[], prospect, linkedIn);
   if (!hook) {
     return noHookDraft(prospect);
   }

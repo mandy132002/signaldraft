@@ -17,12 +17,15 @@ function formatDuration(ms?: number) {
   return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
+const PAGE_SIZE = 10;
+
 export default function HistoryClient() {
   const search = useSearchParams();
   const { applyServerDraft } = useLiveSession();
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [copied, setCopied] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [editSubject, setEditSubject] = useState("");
@@ -96,6 +99,31 @@ export default function HistoryClient() {
       return hay.includes(needle);
     });
   }, [runs, q]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+
+  const pageRuns = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, safePage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // Deep link ?run=… → open that row and jump to its page
+  useEffect(() => {
+    if (!open || !filtered.length) return;
+    const idx = filtered.findIndex((r) => r.id === open);
+    if (idx < 0) return;
+    const target = Math.floor(idx / PAGE_SIZE) + 1;
+    setPage((p) => (p === target ? p : target));
+  }, [open, filtered]);
 
   async function copyText(label: string, text: string) {
     try {
@@ -233,49 +261,82 @@ export default function HistoryClient() {
               <p>Loading saved runs…</p>
             </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Prospect</th>
-                  <th>Status</th>
-                  <th>Email subject</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr
-                    className={`clickable ${r.id === open ? "selected-row" : ""}`}
-                    key={r.id}
-                    onClick={() => setOpen(r.id === open ? null : r.id)}
-                  >
-                    <td>{new Date(r.createdAt).toLocaleString()}</td>
-                    <td>
-                      {r.prospect.fullName}
-                      <div style={{ color: "var(--muted)", fontSize: 12 }}>
-                        {r.prospect.title} · {r.prospect.company}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
-                      {r.status === "approved" || r.status === "rejected" ? (
-                        <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>email stored</div>
-                      ) : r.draft?.body ? (
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>awaiting decision</div>
-                      ) : null}
-                    </td>
-                    <td>{r.draft?.subject ?? r.error ?? "—"}</td>
-                  </tr>
-                ))}
-                {!filtered.length ? (
+            <>
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan={4} style={{ color: "var(--muted)" }}>
-                      {runs.length ? "No matches." : "No saved runs yet. Generate a draft from Live run."}
-                    </td>
+                    <th>When</th>
+                    <th>Prospect</th>
+                    <th>Status</th>
+                    <th>Email subject</th>
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pageRuns.map((r) => (
+                    <tr
+                      className={`clickable ${r.id === open ? "selected-row" : ""}`}
+                      key={r.id}
+                      onClick={() => setOpen(r.id === open ? null : r.id)}
+                    >
+                      <td>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td>
+                        {r.prospect.fullName}
+                        <div style={{ color: "var(--muted)", fontSize: 12 }}>
+                          {r.prospect.title} · {r.prospect.company}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
+                        {r.status === "approved" || r.status === "rejected" ? (
+                          <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>email stored</div>
+                        ) : r.draft?.body ? (
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>awaiting decision</div>
+                        ) : null}
+                      </td>
+                      <td>{r.draft?.subject ?? r.error ?? "—"}</td>
+                    </tr>
+                  ))}
+                  {!filtered.length ? (
+                    <tr>
+                      <td colSpan={4} style={{ color: "var(--muted)" }}>
+                        {runs.length ? "No matches." : "No saved runs yet. Generate a draft from Live run."}
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+
+              {filtered.length > 0 ? (
+                <div className="pagination" role="navigation" aria-label="Run history pages">
+                  <p className="pagination-meta">
+                    Showing {(safePage - 1) * PAGE_SIZE + 1}–
+                    {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                    {q.trim() ? " matches" : " runs"}
+                  </p>
+                  <div className="pagination-controls">
+                    <button
+                      type="button"
+                      className="btn ghost pagination-btn"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </button>
+                    <span className="pagination-pages" aria-live="polite">
+                      Page {safePage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn ghost pagination-btn"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
 

@@ -63,6 +63,7 @@ Nothing is auto-sent. A hold is the correct outcome when the hook is not confirm
 
 ## Residual risks (not fully solved)
 
-- **Single-token brands** (`Apple`, `Delta`, `Meta`) can still collide with other orgs that share the word. Prefer the legal name when you know it (`Apple Inc`, `Delta Air Lines`).
+- **Single-token brands** (`Apple`, `Delta`, `Meta`, `Cube`) can still collide. Prefer a precise name (`Cube.dev`) **and** a LinkedIn URL. See [SAME_NAME_COMPANIES.md](./SAME_NAME_COMPANIES.md).
 - **Very common names** (`John Smith` at a large company) still need a LinkedIn URL for a safe person match.
 - **Stale hooks** older than ~18 months are dropped; “old but still true” funding stories can be missed.
+- LinkedIn pages often block scrapers — workplace confirmation may be empty even when a URL is provided.

@@ -149,6 +149,7 @@ The pipeline prefers a **hold** over a wrong or invented email. Details: [docs/E
 | Case | Example | Outcome |
 | --- | --- | --- |
 | Lookalike company | Cube Global vs CUBE / Cube Logic | Dropped — exact phrase required |
+| Same short name | Cube vs Cube.dev vs other Cubes | LinkedIn workplace used to pick the right org — see [docs/SAME_NAME_COMPANIES.md](docs/SAME_NAME_COMPANIES.md) |
 | Person at another org | Bezos / Amazon vs Blue Origin news | Not used as the hook |
 | No public hook | Low-coverage company | Internal hold — Gmail disabled |
 | Sensitive news | Layoffs, lawsuit, death, breach | Safer hook if one exists; else caution draft |

@@ -2,12 +2,23 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { noHookDraft } from "./draft";
 import { isHoldDraft, isSensitiveHook } from "./edge-cases";
-import { capDraftConfidence, draftQualityFails, parseDraftConfidence } from "./llm";
-import { applyEntityResolution } from "./llm";
 import {
+  extractDomainHints,
+  extractEmployerHints,
+  linkedInConfirmsCompany,
+} from "./linkedin";
+import {
+  applyEntityResolution,
+  capDraftConfidence,
+  draftQualityFails,
+  parseDraftConfidence,
+} from "./llm";
+import {
+  isAmbiguousCompanyName,
   isPersonCompanySplit,
   looksLikeWrongCompany,
   mentionsCompanyExact,
+  mentionsLinkedInWorkplace,
   mentionsPerson,
   pickHook,
   type RankedSignal,
@@ -197,5 +208,53 @@ describe("edge case 4 — sensitive news", () => {
       relevance: 0.6,
     });
     assert.equal(pickHook([layoff, launch], bezos)?.id, "launch");
+  });
+});
+
+describe("same-name companies — LinkedIn workplace", () => {
+  it("treats short brands as ambiguous", () => {
+    assert.equal(isAmbiguousCompanyName("Cube"), true);
+    assert.equal(isAmbiguousCompanyName("Meta"), true);
+    assert.equal(isAmbiguousCompanyName("Cube Global"), false);
+    assert.equal(isAmbiguousCompanyName("BrowserStack"), false);
+  });
+
+  it("extracts employer and domain hints from LinkedIn-style headlines", () => {
+    assert.ok(extractEmployerHints("Colin Ross - Delivery Manager at Cube").some((h) => /cube/i.test(h)));
+    assert.deepEqual(extractDomainHints("Building the semantic layer at cube.dev"), ["cube.dev"]);
+    assert.equal(linkedInConfirmsCompany("Cube", ["Cube.dev"], ["cube.dev"]), true);
+    assert.equal(linkedInConfirmsCompany("Cube", ["Cube Logistics"], []), false);
+  });
+
+  it("prefers LinkedIn workplace news over a generic Cube collision", () => {
+    const colin: ProspectInput = {
+      fullName: "Colin Ross",
+      title: "Delivery Manager",
+      company: "Cube",
+      senderName: "Mandar",
+      senderCompany: "BrowserStack",
+      senderOffer: "AI-enabled agentic testing platform",
+    };
+    const linkedIn = {
+      employerHints: ["Cube"],
+      domainHints: ["cube.dev"],
+      employerMatchesCompany: true as boolean | null,
+    };
+    const wrong = signal({
+      id: "wrong",
+      title: "Cube Logistics raises Series B",
+      relevance: 0.85,
+      matchTier: "exact",
+    });
+    const right = signal({
+      id: "right",
+      title: "Cube.dev unlocks agentic AI benchmarks",
+      summary: "cube.dev announces wrapping benchmarks",
+      relevance: 0.55,
+      matchTier: "exact",
+    });
+    assert.equal(mentionsLinkedInWorkplace(`${right.title} ${right.summary}`, linkedIn), true);
+    assert.equal(mentionsLinkedInWorkplace(wrong.title, linkedIn), false);
+    assert.equal(pickHook([wrong, right], colin, linkedIn)?.id, "right");
   });
 });

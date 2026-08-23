@@ -107,6 +107,45 @@ export function exactCompanyPhrase(company: string): string {
   return companyAliases(company)[0] ?? company.trim();
 }
 
+/**
+ * Single-token short brands that collide often (Cube, Meta, Delta, Apex…).
+ * Multi-word names like "Cube Global" use exact-phrase matching instead.
+ */
+export function isAmbiguousCompanyName(company: string): boolean {
+  const phrase = exactCompanyPhrase(company);
+  const tokens = phrase.split(/\s+/).filter(Boolean);
+  if (tokens.length !== 1) return false;
+  return tokens[0]!.length <= 8;
+}
+
+/**
+ * Signal text mentions a LinkedIn-derived employer alias or domain
+ * (helps pick the right "Cube" when LinkedIn says Cube.dev).
+ */
+export function mentionsLinkedInWorkplace(
+  text: string,
+  linkedIn?: {
+    employerHints?: string[];
+    domainHints?: string[];
+    employerMatchesCompany?: boolean | null;
+  } | null
+): boolean {
+  if (!linkedIn?.employerMatchesCompany) return false;
+  const blob = text.toLowerCase();
+
+  for (const d of linkedIn.domainHints || []) {
+    if (blob.includes(d.toLowerCase())) return true;
+  }
+
+  for (const h of linkedIn.employerHints || []) {
+    if (h.length < 3) continue;
+    // Prefer specific aliases (Cube.dev / multi-word) over bare "Cube" alone
+    if (/[.]/.test(h) && blob.includes(h.toLowerCase())) return true;
+    if (h.split(/\s+/).length >= 2 && wordMatch(text, h)) return true;
+  }
+  return false;
+}
+
 export function wordMatch(haystack: string, needle: string): boolean {
   if (!needle.trim()) return false;
   const escaped = needle
@@ -274,10 +313,18 @@ function roleFit(kind: SignalKind, title: string): { points: number; label: stri
   return { points: 0.02, label: "general news" };
 }
 
-export function rankSignals(signals: Signal[], prospect: ProspectInput): RankedSignal[] {
+export function rankSignals(
+  signals: Signal[],
+  prospect: ProspectInput,
+  linkedIn?: {
+    employerHints?: string[];
+    domainHints?: string[];
+    employerMatchesCompany?: boolean | null;
+  } | null
+): RankedSignal[] {
   const notes = (prospect.notes ?? "").toLowerCase();
   const ranked = signals
-    .map((raw) => evaluate(raw, prospect, notes))
+    .map((raw) => evaluate(raw, prospect, notes, linkedIn))
     .sort((a, b) => {
       if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
       return b.relevance - a.relevance;
@@ -288,7 +335,16 @@ export function rankSignals(signals: Signal[], prospect: ProspectInput): RankedS
   });
 }
 
-function evaluate(raw: Signal, prospect: ProspectInput, notes: string): RankedSignal {
+function evaluate(
+  raw: Signal,
+  prospect: ProspectInput,
+  notes: string,
+  linkedIn?: {
+    employerHints?: string[];
+    domainHints?: string[];
+    employerMatchesCompany?: boolean | null;
+  } | null
+): RankedSignal {
   if (raw.kind === "company") {
     return {
       ...raw,
@@ -373,6 +429,18 @@ function evaluate(raw: Signal, prospect: ProspectInput, notes: string): RankedSi
   } else if (hasPerson && !hasExactCompany) {
     score -= 0.1;
     reasons.push("person named without target company (possible other employer)");
+  }
+
+  if (mentionsLinkedInWorkplace(text, linkedIn)) {
+    score += 0.16;
+    reasons.push("matches LinkedIn workplace / domain");
+  } else if (isAmbiguousCompanyName(prospect.company) && hasExactCompany && linkedIn?.employerMatchesCompany === true) {
+    // Ambiguous "Cube" hit that does not mention LinkedIn workplace aliases — demote
+    score -= 0.08;
+    reasons.push("ambiguous company name — prefer LinkedIn-confirmed workplace");
+  } else if (isAmbiguousCompanyName(prospect.company) && hasExactCompany && !linkedIn?.employerMatchesCompany) {
+    score -= 0.05;
+    reasons.push("ambiguous company name — LinkedIn workplace not confirmed");
   }
 
   if (startsWithCompany(raw.title, prospect.company)) {
@@ -533,10 +601,19 @@ export function isSoftCandidate(
 }
 
 /**
- * Prefer hooks that are (1) about this person+company, (2) relevant to what we sell, (3) high score.
+ * Prefer hooks that are (1) about this person+company, (2) LinkedIn workplace when
+ * the company name is ambiguous, (3) relevant to what we sell, (4) high score.
  * Never pick a lookalike or person-only-other-employer item as the sendable hook.
  */
-export function pickHook(ranked: RankedSignal[], prospect?: ProspectInput): RankedSignal | undefined {
+export function pickHook(
+  ranked: RankedSignal[],
+  prospect?: ProspectInput,
+  linkedIn?: {
+    employerHints?: string[];
+    domainHints?: string[];
+    employerMatchesCompany?: boolean | null;
+  } | null
+): RankedSignal | undefined {
   const eligible = ranked.filter((s) => s.eligible && s.kind !== "company");
   if (!eligible.length) return undefined;
 
@@ -545,8 +622,14 @@ export function pickHook(ranked: RankedSignal[], prospect?: ProspectInput): Rank
     : eligible;
 
   // Edge cases 1+2: lookalikes and person/org-split items cannot be the primary hook.
-  const pool = companyTied.length ? companyTied : [];
+  let pool = companyTied.length ? companyTied : [];
   if (!pool.length) return undefined;
+
+  // Same-name companies (Cube): if LinkedIn confirms workplace, prefer those signals
+  if (prospect && isAmbiguousCompanyName(prospect.company) && linkedIn?.employerMatchesCompany) {
+    const workplace = pool.filter((s) => mentionsLinkedInWorkplace(`${s.title} ${s.summary}`, linkedIn));
+    if (workplace.length) pool = workplace;
+  }
 
   const nonSensitive = pool.filter((s) => !s.sensitive && !isSensitiveHook(s.title, s.summary));
   const hookPool = nonSensitive.length ? nonSensitive : pool;
@@ -559,6 +642,7 @@ export function pickHook(ranked: RankedSignal[], prospect?: ProspectInput): Rank
       else if (mentionsPerson(text, prospect.fullName) && mentionsCompanyExact(text, prospect.company)) {
         score += 0.1;
       }
+      if (mentionsLinkedInWorkplace(text, linkedIn)) score += 0.12;
       const pitch = offerFit(text, prospect.senderOffer);
       score += pitch.points;
       if (s.matchTier === "exact") score += 0.06;

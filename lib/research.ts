@@ -1,9 +1,10 @@
 import { XMLParser } from "fast-xml-parser";
-import { linkedInHintTokens, loadLinkedInContext, parseLinkedInUrl } from "./linkedin";
+import { linkedInHintTokens, linkedInCompanySearchPhrases, loadLinkedInContext, parseLinkedInUrl } from "./linkedin";
 import { offerKeywords, offerNewsQueryClause } from "./offer";
 import {
   distinctiveCompanyTokens,
   exactCompanyPhrase,
+  isAmbiguousCompanyName,
   isSoftCandidate,
   kindFromTitle,
   pickHook,
@@ -132,10 +133,12 @@ export async function googleNewsSignals(
   company: string,
   fullName: string,
   linkedInTokens: string[],
-  limit = 16
+  limit = 16,
+  extraSoftTokens: string[] = []
 ): Promise<Signal[]> {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   const xml = await fetchText(url);
+  const softTokens = [...linkedInTokens, ...extraSoftTokens];
   return itemsFromRss(xml)
     .slice(0, limit)
     .map((item) => {
@@ -153,7 +156,11 @@ export async function googleNewsSignals(
         why: "",
       } satisfies Signal;
     })
-    .filter((s) => s.title && isSoftCandidate(`${s.title} ${s.summary}`, company, fullName, linkedInTokens));
+    .filter((s) => {
+      const blob = `${s.title} ${s.summary}`;
+      if (isSoftCandidate(blob, company, fullName, softTokens)) return true;
+      return extraSoftTokens.some((t) => t.length >= 3 && blob.toLowerCase().includes(t.toLowerCase()));
+    });
 }
 
 export async function hnMentions(
@@ -220,6 +227,7 @@ export async function researchProspect(
   const personQuoted = quoted(input.fullName.trim());
   const linkedIn = await loadLinkedInContext(input);
   const liTokens = linkedInHintTokens(linkedIn?.vanity || parseLinkedInUrl(input.linkedinUrl)?.vanity);
+  const workplacePhrases = linkedInCompanySearchPhrases(input.company, linkedIn);
   const softToken = distinctiveCompanyTokens(input.company)[0];
   const offerClause = offerNewsQueryClause(input.senderOffer);
   const offerKws = offerKeywords(input.senderOffer);
@@ -230,8 +238,24 @@ export async function researchProspect(
   }
   if (linkedIn) {
     notes.push(`LinkedIn: ${linkedIn.url} · ${linkedIn.note}`);
+    if (linkedIn.employerHints.length) {
+      notes.push(`LinkedIn employer hints: ${linkedIn.employerHints.join(", ")}`);
+    }
+    if (linkedIn.domainHints.length) {
+      notes.push(`LinkedIn domains: ${linkedIn.domainHints.join(", ")}`);
+    }
+    if (isAmbiguousCompanyName(input.company) && linkedIn.employerMatchesCompany !== true) {
+      notes.push(
+        `Ambiguous company name "${input.company}" — add a precise legal name or ensure LinkedIn shows this workplace.`
+      );
+    }
   } else {
     notes.push("No LinkedIn URL provided.");
+    if (isAmbiguousCompanyName(input.company)) {
+      notes.push(
+        `Ambiguous company name "${input.company}" — LinkedIn URL strongly recommended to pick the right org.`
+      );
+    }
   }
 
   const tasks: Promise<Signal[]>[] = [
@@ -336,6 +360,37 @@ export async function researchProspect(
     );
   }
 
+  // Same-name companies: search LinkedIn workplace aliases / domains (cube.dev, etc.)
+  for (const phraseExtra of workplacePhrases) {
+    const qExtra = quoted(phraseExtra);
+    tasks.push(
+      googleNewsSignals(
+        `${qExtra} when:2y`,
+        "product",
+        input.company,
+        input.fullName,
+        liTokens,
+        12,
+        workplacePhrases
+      ).then((s) => {
+        notes.push(`LinkedIn-workplace news (${phraseExtra}): ${s.length}`);
+        return s;
+      }),
+      googleNewsSignals(
+        `${personQuoted} ${qExtra} when:3y`,
+        "person",
+        input.company,
+        input.fullName,
+        liTokens,
+        10,
+        workplacePhrases
+      ).then((s) => {
+        notes.push(`Person + LinkedIn workplace (${phraseExtra}): ${s.length}`);
+        return s;
+      })
+    );
+  }
+
   tasks.push(
     hnMentions(input.company, input.fullName, liTokens, input.senderOffer).then((s) => {
       notes.push(`Hacker News: ${s.length}`);
@@ -362,7 +417,7 @@ export async function researchProspect(
     else if ((s.publishedAt ?? "") > (prev.publishedAt ?? "")) dedup.set(key, s);
   }
 
-  const ranked = rankSignals([...dedup.values()], input);
+  const ranked = rankSignals([...dedup.values()], input, linkedIn);
   const kept = ranked.filter((s) => s.eligible).length;
   const dropped = ranked.filter((s) => !s.eligible && s.kind !== "company").length;
   const offerAligned = ranked.filter((s) => s.eligible && /offer fit:/i.test(s.why || "")).length;

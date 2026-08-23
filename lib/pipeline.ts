@@ -84,7 +84,7 @@ export async function executeRun(
       run,
       "intake",
       "done",
-      `Researching ${prospect.fullName} at ${prospect.company}${prospect.linkedinUrl ? " (+ LinkedIn)" : ""}. Soft name recall; LLM confirms entity.`
+      `Researching ${prospect.fullName} at ${prospect.company}${prospect.linkedinUrl ? " (+ LinkedIn workplace)" : ""}. Soft name recall; LLM confirms entity.`
     );
     onUpdate(run);
 
