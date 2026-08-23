@@ -61,6 +61,68 @@ body::before {
   z-index: 0;
 }
 
+/* ——— Live home atmosphere ——— */
+.home-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 0.7s var(--ease);
+}
+.home-backdrop.is-dim {
+  opacity: 0.32;
+}
+.home-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  will-change: transform;
+}
+.home-orb-copper {
+  width: min(58vw, 640px);
+  height: min(58vw, 640px);
+  top: -12%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(201, 100, 66, 0.34) 0%, rgba(201, 100, 66, 0.08) 42%, transparent 70%);
+  animation: home-drift 26s ease-in-out infinite;
+}
+.home-orb-sage {
+  width: min(50vw, 520px);
+  height: min(50vw, 520px);
+  bottom: -16%;
+  left: -12%;
+  background: radial-gradient(circle, rgba(61, 122, 92, 0.22) 0%, rgba(61, 122, 92, 0.06) 45%, transparent 70%);
+  animation: home-drift 32s ease-in-out infinite reverse;
+}
+.home-orb-warm {
+  width: min(36vw, 380px);
+  height: min(36vw, 380px);
+  top: 42%;
+  left: 38%;
+  background: radial-gradient(circle, rgba(243, 181, 154, 0.28) 0%, transparent 68%);
+  animation: home-drift 22s ease-in-out infinite 1.4s;
+}
+.home-signal-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.home-ring {
+  transform-origin: 1180px 160px;
+  animation: home-spin 64s linear infinite;
+}
+@keyframes home-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-4%, 5%) scale(1.08); }
+  70% { transform: translate(3%, -3%) scale(0.96); }
+}
+@keyframes home-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 a { color: inherit; text-decoration: none; }
 
 .app-shell {
@@ -321,7 +383,9 @@ a { color: inherit; text-decoration: none; }
   .live-form,
   .app-shell,
   .login-panel,
-  .card {
+  .card,
+  .home-orb,
+  .home-ring {
     animation: none !important;
     transition: none !important;
   }
