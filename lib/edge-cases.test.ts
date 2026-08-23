@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { noHookDraft } from "./draft";
 import { isHoldDraft, isSensitiveHook } from "./edge-cases";
+import { capDraftConfidence, parseDraftConfidence } from "./llm";
 import { applyEntityResolution } from "./llm";
 import {
   isPersonCompanySplit,
@@ -113,6 +114,22 @@ describe("edge case 3 — no confirmed hook", () => {
     assert.match(draft.subject, /^HOLD/);
     assert.match(draft.body, /do not send/i);
     assert.equal(draft.usedSignalIds.length, 0);
+  });
+});
+
+describe("draft confidence", () => {
+  it("parses Groq high/medium/low and ignores junk", () => {
+    assert.equal(parseDraftConfidence("high", "exact Amazon hook").confidence, "high");
+    assert.equal(parseDraftConfidence("LOW", "thin").confidence, "low");
+    assert.equal(parseDraftConfidence("pretty sure", "", "medium").confidence, "medium");
+    assert.match(parseDraftConfidence("high", "exact Amazon hook").confidenceWhy || "", /Amazon/);
+  });
+
+  it("caps high on sensitive or rewritten drafts", () => {
+    assert.equal(capDraftConfidence("high", { sensitive: true }), "medium");
+    assert.equal(capDraftConfidence("high", { rewritten: true }), "medium");
+    assert.equal(capDraftConfidence("high", { hold: true }), "low");
+    assert.equal(capDraftConfidence("medium", { sensitive: true }), "medium");
   });
 });
 

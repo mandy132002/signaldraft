@@ -291,9 +291,18 @@ export default function HistoryClient() {
                 <br />
                 Hook: {selected.draft.hook}
                 <br />
-                {selected.draft.model} · {selected.draft.confidence}
+                {selected.draft.model}{" "}
+                <span className={`badge confidence-${selected.draft.confidence}`}>
+                  Confidence {selected.draft.confidence}
+                </span>
                 {selected.draft.hold ? " · hold" : ""}
                 {selected.reviewNote ? ` · note: ${selected.reviewNote}` : ""}
+                {selected.draft.confidenceWhy ? (
+                  <>
+                    <br />
+                    {selected.draft.confidenceWhy}
+                  </>
+                ) : null}
                 <br />
                 {selected.status === "approved" || selected.status === "rejected"
                   ? `Stored · ${selected.status}`

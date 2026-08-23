@@ -402,6 +402,11 @@ export default function BulkJobPage() {
                 <h2 style={{ margin: 0 }}>
                   {selected.prospect.fullName}{" "}
                   <span className={`badge ${selected.status}`}>{selected.status.replace("_", " ")}</span>
+                  {selected.draft?.confidence ? (
+                    <span className={`badge confidence-${selected.draft.confidence}`} style={{ marginLeft: 6 }}>
+                      Confidence {selected.draft.confidence}
+                    </span>
+                  ) : null}
                 </h2>
                 {(() => {
                   const item = job?.items.find((i) => i.runId === selected.id || matchRun(i, [selected]));
@@ -417,6 +422,7 @@ export default function BulkJobPage() {
                 {selected.prospect.title ? `${selected.prospect.title} · ` : ""}
                 {selected.prospect.company}
                 {selected.chosenSignal ? ` · Hook: ${selected.chosenSignal.title}` : ""}
+                {selected.draft?.confidenceWhy ? ` · ${selected.draft.confidenceWhy}` : ""}
               </p>
               {selected.draft && isHoldDraft(selected.draft) ? (
                 <div className="callout hold">

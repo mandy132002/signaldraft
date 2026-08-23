@@ -89,6 +89,7 @@ If you have a source, add a LinkedIn URL or a note and run again.
 — ${sender} (internal)`,
     hook: "No confirmed entity match",
     confidence: "low",
+    confidenceWhy: "No confirmed person+company hook — this is a hold, not a sendable email.",
     usedSignalIds: [],
     model: "hold",
     hold: true,
@@ -141,6 +142,9 @@ ${fromLine}`;
     body,
     hook: hook.title,
     confidence: sensitive && baseConfidence === "high" ? "medium" : baseConfidence,
+    confidenceWhy: sensitive
+      ? "Heuristic draft on a sensitive hook — review tone before sending."
+      : "Groq draft unavailable; confidence is from hook strength, not a model self-rating.",
     usedSignalIds: [hook.id],
     model: analysis ? "heuristic+analysis" : "heuristic-grounded",
     sensitiveHook: sensitive,
@@ -188,7 +192,8 @@ export async function resolveAndAnalyze(
         }
       }
     } else {
-      entityNote = "LLM entity check failed — using exact-tier heuristic only.";
+      entityNote =
+        "Groq entity check failed — using exact-tier heuristic only. The key is set; the model returned no usable JSON. Soft/suspect hits were not auto-kept.";
       signals = ranked.map((s) => {
         if (s.kind === "company") return { ...s, eligible: false };
         const ok = s.matchTier === "exact" || s.matchTier === "person";

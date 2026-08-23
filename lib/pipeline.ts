@@ -20,8 +20,8 @@ function stages(): StageEvent[] {
     ["news", "Public news & funding"],
     ["hiring", "Person + company signals"],
     ["rank", "Soft-rank candidates"],
-    ["resolve", "LLM entity match"],
-    ["analyze", "LLM analysis"],
+    ["resolve", "Groq entity match"],
+    ["analyze", "Groq analysis"],
     ["draft", "Draft outreach email"],
     ["review", "SDR review (not sent)"],
   ] as const;
@@ -134,7 +134,7 @@ export async function executeRun(
       run,
       "resolve",
       "running",
-      `LLM (${llmModelName()}) deciding which names match ${prospect.company} / ${prospect.fullName}.`
+      `Groq (${llmModelName()}) deciding which names match ${prospect.company} / ${prospect.fullName}.`
     );
     onUpdate(run);
 

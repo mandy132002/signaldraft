@@ -55,6 +55,8 @@ export type OutreachDraft = {
   body: string;
   hook: string;
   confidence: "high" | "medium" | "low";
+  /** Why Groq (or the heuristic) assigned this confidence */
+  confidenceWhy?: string;
   usedSignalIds: string[];
   model: string;
   /** True when there is no confirmed person+company hook — not a sendable email */

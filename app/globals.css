@@ -608,6 +608,24 @@ button {
   background: var(--warn-soft);
   border-color: transparent;
 }
+.badge.confidence-high {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: transparent;
+  text-transform: none;
+}
+.badge.confidence-medium {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: transparent;
+  text-transform: none;
+}
+.badge.confidence-low {
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-color: transparent;
+  text-transform: none;
+}
 
 .callout {
   border-radius: var(--radius-sm);

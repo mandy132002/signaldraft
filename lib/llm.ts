@@ -41,48 +41,108 @@ export async function llmAvailable(): Promise<boolean> {
   return Boolean(GROQ_API_KEY);
 }
 
+type GroqChatOpts = {
+  maxTokens?: number;
+  json?: boolean;
+  reasoning?: boolean;
+};
+
+function pickMessageText(message?: {
+  content?: string | null;
+  reasoning?: string | null;
+}): string | null {
+  const content = message?.content?.trim();
+  if (content) return content;
+  const reasoning = message?.reasoning?.trim();
+  if (reasoning) {
+    const extracted = extractJsonObject(reasoning);
+    if (extracted) return JSON.stringify(extracted);
+  }
+  return null;
+}
+
 async function groqChatOnce(
   model: string,
   system: string,
   user: string,
-  temperature: number
-): Promise<{ content: string | null; retryable: boolean }> {
+  temperature: number,
+  opts: GroqChatOpts = {}
+): Promise<{ content: string | null; retryable: boolean; reason?: string }> {
+  const isOss = /gpt-oss/i.test(model);
+  const maxTokens = opts.maxTokens ?? (isOss ? 4096 : 1200);
+  const payload: Record<string, unknown> = {
+    model,
+    temperature,
+    max_completion_tokens: maxTokens,
+    max_tokens: maxTokens,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  if (opts.json !== false) {
+    payload.response_format = { type: "json_object" };
+  }
+  if (isOss && opts.reasoning !== false) {
+    payload.reasoning_effort = "low";
+    payload.include_reasoning = false;
+  }
+
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${GROQ_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      temperature,
-      max_tokens: 900,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const text = await res.text();
     const modelGone = /model_not_found|does not exist|decommissioned/i.test(text);
+    const formatIssue = /response_format|json_object|json_validate|reasoning/i.test(text);
     console.error(`Groq error (${model})`, res.status, text);
-    return { content: null, retryable: modelGone };
+    return {
+      content: null,
+      retryable: modelGone || formatIssue || res.status >= 500,
+      reason: text.slice(0, 160),
+    };
   }
   const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{
+      finish_reason?: string;
+      message?: { content?: string | null; reasoning?: string | null };
+    }>;
   };
-  return { content: json.choices?.[0]?.message?.content ?? null, retryable: false };
+  const choice = json.choices?.[0];
+  const content = pickMessageText(choice?.message);
+  if (!content) {
+    const truncated = choice?.finish_reason === "length";
+    console.error(`Groq empty content (${model})`, choice?.finish_reason);
+    return {
+      content: null,
+      retryable: true,
+      reason: truncated ? "reasoning used the full token budget" : "empty model content",
+    };
+  }
+  return { content, retryable: false };
 }
 
 async function groqChat(system: string, user: string, temperature = 0.3): Promise<string | null> {
   if (!GROQ_API_KEY) return null;
   try {
     for (const model of GROQ_MODEL_FALLBACKS) {
-      const { content, retryable } = await groqChatOnce(model, system, user, temperature);
-      if (content) return content;
-      if (!retryable) break;
+      const first = await groqChatOnce(model, system, user, temperature);
+      if (first.content) return first.content;
+
+      // gpt-oss + JSON mode sometimes 400s or returns empty — retry same model without JSON constraint
+      if (first.retryable) {
+        const retry = await groqChatOnce(model, system, user, temperature, {
+          json: false,
+          reasoning: false,
+          maxTokens: 4096,
+        });
+        if (retry.content) return retry.content;
+      }
     }
     return null;
   } catch (e) {
@@ -94,6 +154,28 @@ async function groqChat(system: string, user: string, temperature = 0.3): Promis
 /** Groq chat — always asks for JSON. */
 async function llmChat(system: string, user: string, temperature = 0.3): Promise<string | null> {
   return groqChat(system, user, temperature);
+}
+
+export function parseDraftConfidence(
+  raw: unknown,
+  why: unknown,
+  fallback: "high" | "medium" | "low" = "medium"
+): { confidence: "high" | "medium" | "low"; confidenceWhy?: string } {
+  const value = String(raw || "").toLowerCase().trim();
+  const confidence =
+    value === "high" || value === "medium" || value === "low" ? value : fallback;
+  const confidenceWhy = String(why || "").trim().slice(0, 220) || undefined;
+  return { confidence, confidenceWhy };
+}
+
+export function capDraftConfidence(
+  confidence: "high" | "medium" | "low",
+  opts: { sensitive?: boolean; hold?: boolean; rewritten?: boolean }
+): "high" | "medium" | "low" {
+  if (opts.hold) return "low";
+  if (opts.sensitive && confidence === "high") return "medium";
+  if (opts.rewritten && confidence === "high") return "medium";
+  return confidence;
 }
 
 function extractJsonObject(text: string): Record<string, unknown> | null {
@@ -171,7 +253,7 @@ export async function resolveEntities(
   candidates: Signal[],
   linkedIn?: LinkedInContext | null
 ): Promise<EntityResolution | null> {
-  const pool = candidates.filter((s) => s.kind !== "company").slice(0, 18);
+  const pool = candidates.filter((s) => s.kind !== "company").slice(0, 12);
   if (!pool.length) {
     return { matchedIds: [], chosenHookId: null, note: "No candidates to resolve.", rejected: [] };
   }
@@ -217,11 +299,10 @@ ${JSON.stringify(
   pool.map((s) => ({
     id: s.id,
     title: s.title,
-    summary: s.summary,
+    summary: (s.summary || "").slice(0, 180),
     kind: s.kind,
     matchTier: s.matchTier,
     source: s.source,
-    relevance: s.relevance,
   })),
   null,
   2
@@ -242,7 +323,14 @@ Rules:
 - chosenHookId should be the strongest outreach hook for selling "${prospect.senderOffer?.trim() || "the offer"}" to this person
 - If nothing clearly matches "${prospect.company}", return matchedIds: [] and chosenHookId: null`;
 
-  const raw = await llmChat(system, user, 0.1);
+  let raw = await llmChat(system, user, 0.1);
+  if (!raw) {
+    raw = await llmChat(
+      `${system}\nKeep the JSON tiny: matchedIds, chosenHookId, note, rejected.`,
+      user,
+      0.1
+    );
+  }
   if (!raw) return null;
   const obj = extractJsonObject(raw);
   if (!obj) return null;
@@ -675,7 +763,13 @@ Open to a 15-minute chat this week?
 
 ${sender}${senderCo ? `\n${senderCo}` : ""}"
 
-Return JSON only: {"subject":"...","body":"..."}`;
+Return JSON only:
+{"subject":"...","body":"...","confidence":"high|medium|low","confidenceWhy":"one sentence on how sure you are this email is accurate and sendable"}
+
+Confidence rules (be honest — this is shown to the SDR):
+- high: hook clearly names this person or this exact company, facts are in the pack, offer bridge is natural
+- medium: company match is solid but the hook is thin, older, or the offer link is inferred
+- low: you had to hedge, the hook is weak/stale/sensitive, or you are not sure this is the right entity`
 
   const attempt = async (extra?: string) => {
     const raw = await llmChat(system, extra ? `${user}\n\nFIX PREVIOUS OUTPUT: ${extra}` : user, 0.15);
@@ -685,6 +779,7 @@ Return JSON only: {"subject":"...","body":"..."}`;
     return {
       subject: String(obj.subject).slice(0, 80),
       body: ensureGreetingAndSignature(String(obj.body).trim().replace(/\\n/g, "\n"), prospect),
+      ...parseDraftConfidence(obj.confidence, obj.confidenceWhy, "medium"),
     };
   };
 
@@ -696,13 +791,14 @@ Return JSON only: {"subject":"...","body":"..."}`;
   let parsed = await attempt();
   if (!parsed) return null;
 
+  let rewritten = false;
   if (needsRewrite(parsed.body)) {
+    rewritten = true;
     parsed = await attempt(
       `Wrong company or ignored hook. Rewrite ONLY about ${prospect.fullName} at ${prospect.company}. Opening MUST cite this hook: "${snippet}". Do NOT mention Amazon or any other company unless it is ${prospect.company} or appears in the hook. MUST start with "Hi ${first}," and end with the signature.`
     );
     if (!parsed) return null;
     if (needsRewrite(parsed.body)) {
-      // Second hard retry
       parsed = await attempt(
         `STRICT: First content sentence must include the word "${prospect.company}" and reference the hook theme. Zero other employer names.`
       );
@@ -711,13 +807,18 @@ Return JSON only: {"subject":"...","body":"..."}`;
   }
 
   const sensitive = Boolean(hook.sensitive) || isSensitiveHook(hook.title, hook.summary);
-  const baseConfidence = hook.relevance >= 0.75 ? "high" : hook.relevance >= 0.55 ? "medium" : "low";
+  const confidence = capDraftConfidence(parsed.confidence, { sensitive, rewritten });
 
   return {
     subject: parsed.subject,
     body: parsed.body,
     hook: hook.title,
-    confidence: sensitive && baseConfidence === "high" ? "medium" : baseConfidence,
+    confidence,
+    confidenceWhy:
+      parsed.confidenceWhy ||
+      (sensitive
+        ? "Sensitive public event — confidence capped so you review tone."
+        : "Groq rated this draft against the confirmed hook."),
     usedSignalIds: [
       hook.id,
       ...ranked.filter((s) => s.eligible && s.id !== hook.id).slice(0, 2).map((s) => s.id),
@@ -791,7 +892,8 @@ ${sender}${senderCo ? `\n${senderCo}` : ""}
 - No other-company bleed (no Amazon growth pillar unless this prospect is Amazon)
 - No emojis; no "I came across your profile"
 
-Return JSON: {"subject":"...","body":"..."}`;
+Return JSON:
+{"subject":"...","body":"...","confidence":"high|medium|low","confidenceWhy":"one sentence on how sure you are this refined email is accurate"}`;
 
   const raw = await llmChat(system, user, 0.2);
   if (!raw) return null;
@@ -818,13 +920,18 @@ Return JSON: {"subject":"...","body":"..."}`;
     if (bad(body)) return null;
   }
 
+  const rated = parseDraftConfidence(obj.confidence, obj.confidenceWhy, hook.relevance >= 0.75 ? "high" : "medium");
+  const sensitive = Boolean(hook.sensitive) || isSensitiveHook(hook.title, hook.summary);
+
   return {
     subject,
     body,
     hook: hook.title,
-    confidence: hook.relevance >= 0.75 ? "high" : "medium",
+    confidence: capDraftConfidence(rated.confidence, { sensitive }),
+    confidenceWhy: rated.confidenceWhy || "Groq re-rated this draft after your refinement.",
     usedSignalIds: [hook.id],
     model: `${llmModelTag()}+refine`,
+    sensitiveHook: sensitive,
   };
 }
 

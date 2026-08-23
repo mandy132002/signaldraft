@@ -438,14 +438,14 @@ export default function HomePage() {
 
           {run?.entityNote ? (
             <div className="card" style={{ marginBottom: 16 }}>
-              <h2>LLM entity check</h2>
+              <h2>Groq entity check</h2>
               <p style={{ margin: 0, fontSize: 14 }}>{run.entityNote}</p>
             </div>
           ) : null}
 
           {run?.analysis ? (
             <div className="card" style={{ marginBottom: 16 }}>
-              <h2>Local LLM analysis</h2>
+              <h2>Groq analysis</h2>
               <p style={{ margin: "0 0 8px", fontSize: 13 }}>
                 <span className="badge">{run.analysis.sentiment}</span>{" "}
                 <span style={{ color: "var(--muted)" }}>{run.analysis.sentimentWhy}</span>
@@ -478,12 +478,22 @@ export default function HomePage() {
                     sensitive
                   </span>
                 ) : null}
+                {run?.draft?.confidence ? (
+                  <span className={`badge confidence-${run.draft.confidence}`} style={{ marginLeft: 6 }}>
+                    Confidence {run.draft.confidence}
+                  </span>
+                ) : null}
                 {refining ? (
                   <span style={{ marginLeft: 8, verticalAlign: "middle" }}>
                     <ClaudeSpark size={16} />
                   </span>
                 ) : null}
               </h2>
+              {run?.draft?.confidenceWhy && !isHoldDraft(run.draft) ? (
+                <p className="hint" style={{ marginTop: 0 }}>
+                  {run.draft.confidenceWhy}
+                </p>
+              ) : null}
               {run?.draft && isHoldDraft(run.draft) ? (
                 <div className="callout hold">
                   <strong>No confirmed public hook</strong> for {run.prospect.fullName} at {run.prospect.company}.
@@ -637,8 +647,8 @@ const defaultStages: StageEvent[] = [
   { id: "news", label: "Public news & funding", detail: "Waiting", status: "pending", at: "" },
   { id: "hiring", label: "Person + company signals", detail: "Waiting", status: "pending", at: "" },
   { id: "rank", label: "Soft-rank candidates", detail: "Waiting", status: "pending", at: "" },
-  { id: "resolve", label: "LLM entity match", detail: "Waiting", status: "pending", at: "" },
-  { id: "analyze", label: "Local LLM analysis", detail: "Waiting", status: "pending", at: "" },
+  { id: "resolve", label: "Groq entity match", detail: "Waiting", status: "pending", at: "" },
+  { id: "analyze", label: "Groq analysis", detail: "Waiting", status: "pending", at: "" },
   { id: "draft", label: "Draft outreach email", detail: "Waiting", status: "pending", at: "" },
   { id: "review", label: "SDR review (not sent)", detail: "Waiting", status: "pending", at: "" },
 ];
