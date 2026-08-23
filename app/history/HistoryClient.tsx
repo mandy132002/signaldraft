@@ -251,7 +251,7 @@ export default function HistoryClient() {
               id="dashboard-search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Prospect, company, subject, hook…"
+              placeholder="Search by name, company, subject…"
               disabled={loading}
             />
           </div>

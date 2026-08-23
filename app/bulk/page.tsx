@@ -21,11 +21,9 @@ export default function BulkPage() {
   const router = useRouter();
   const [fileName, setFileName] = useState("prospects.csv");
   const [csvText, setCsvText] = useState("");
-  const [senderName, setSenderName] = useState("Mandar");
-  const [senderCompany, setSenderCompany] = useState("Acme");
-  const [senderOffer, setSenderOffer] = useState(
-    "supply-chain visibility software for large retailers"
-  );
+  const [senderName, setSenderName] = useState("");
+  const [senderCompany, setSenderCompany] = useState("");
+  const [senderOffer, setSenderOffer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<BulkJob[]>([]);
@@ -172,7 +170,7 @@ export default function BulkPage() {
             className="bulk-paste"
             value={csvText}
             onChange={(e) => setCsvText(e.target.value)}
-            placeholder={"fullName,title,company\nJane Doe,VP Ops,Acme Corp"}
+            placeholder={"fullName,title,company\nJane Doe,VP Sales,Acme Inc"}
           />
         </section>
 
@@ -189,7 +187,7 @@ export default function BulkPage() {
           <textarea
             value={senderOffer}
             onChange={(e) => setSenderOffer(e.target.value)}
-            placeholder="One line product/offer"
+            placeholder="Brief description of your product or service"
           />
 
           <button className="btn" type="button" disabled={busy || !preview?.prospects.length} onClick={() => void startBulk()}>

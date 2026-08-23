@@ -452,7 +452,7 @@ export default function BulkJobPage() {
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Optional"
+                placeholder="Optional note"
                 disabled={selected.status !== "needs_review" || acting || refining}
               />
               <RefineEmailBox

@@ -257,28 +257,28 @@ export default function HomePage() {
         >
           <h2>{workspaceActive ? "Who are you writing to?" : "Prospect details"}</h2>
           <label>Prospect full name</label>
-          <input value={form.fullName} onChange={set("fullName")} required placeholder="Jeff Bezos" />
+          <input value={form.fullName} onChange={set("fullName")} required placeholder="Full name" />
           <div className="row2">
             <div>
               <label>Their title</label>
-              <input value={form.title} onChange={set("title")} placeholder="CEO" />
+              <input value={form.title} onChange={set("title")} placeholder="Job title" />
             </div>
             <div>
               <label>Exact company name</label>
-              <input value={form.company} onChange={set("company")} required placeholder="Amazon" />
+              <input value={form.company} onChange={set("company")} required placeholder="Company name" />
             </div>
           </div>
           <label>LinkedIn URL {form.company.trim().split(/\s+/).length <= 1 ? "(recommended)" : "(optional)"}</label>
           <input
             value={form.linkedinUrl}
             onChange={set("linkedinUrl")}
-            placeholder="https://linkedin.com/in/… — used to confirm which company they work at"
+            placeholder="https://linkedin.com/in/username"
           />
           <label>Company website {form.company.trim().split(/\s+/).length <= 1 ? "(recommended)" : "(optional)"}</label>
           <input
             value={form.companyWebsite || ""}
             onChange={set("companyWebsite")}
-            placeholder="https://cube.dev — scraped for context + news search"
+            placeholder="https://company.com"
           />
           <label>You (SDR) — name / your company</label>
           <div className="row2">
@@ -289,10 +289,10 @@ export default function HomePage() {
           <textarea
             value={form.senderOffer}
             onChange={set("senderOffer")}
-            placeholder="One line: the product/service you are pitching them"
+            placeholder="Brief description of your product or service"
           />
           <label>Notes (optional)</label>
-          <textarea value={form.notes} onChange={set("notes")} placeholder="CSV row, known trigger, or extra context" />
+          <textarea value={form.notes} onChange={set("notes")} placeholder="Optional context for research" />
           <button className="btn" disabled={busy} type="submit">
             <span className="btn-inner">
               {busy ? <ClaudeSpark size={18} className="dark" /> : null}
@@ -489,7 +489,7 @@ export default function HomePage() {
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Why approve or reject"
+                placeholder="Optional note for your team"
                 disabled={refining}
               />
 

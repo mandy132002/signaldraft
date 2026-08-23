@@ -96,7 +96,7 @@ export function RefineEmailBox({
             value={refinePrompt}
             onChange={(e) => setRefinePrompt(e.target.value)}
             disabled={refining || disabled}
-            placeholder="e.g. Make it shorter and more formal. Emphasize cost savings for retail ops. Soft CTA — ask if next Tuesday works."
+            placeholder="Shorter, more formal, softer CTA, emphasize ROI…"
           />
           <div className="actions">
             <button

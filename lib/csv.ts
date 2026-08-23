@@ -148,8 +148,8 @@ export function prospectsFromCsv(
 }
 
 export const CSV_TEMPLATE = `fullName,title,company,linkedinUrl,companyWebsite,notes
-Jeff Bezos,Executive Chairman,Amazon,,https://www.amazon.com,
-Satya Nadella,CEO,Microsoft,,https://www.microsoft.com,
+Jane Doe,VP Sales,Acme Inc,,https://www.acme.com,
+John Smith,Director,Example Co,,,
 `;
 
 export const MAX_BULK_ROWS = MAX_ROWS;

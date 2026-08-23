@@ -8,15 +8,15 @@ const STORAGE_KEY = "signaldraft.liveSession.v1";
 const USER_KEY = "signaldraft.liveUserId.v1";
 
 export const defaultProspect: ProspectInput = {
-  fullName: "Jeff Bezos",
-  title: "Executive Chairman",
-  company: "Amazon",
+  fullName: "",
+  title: "",
+  company: "",
   linkedinUrl: "",
   companyWebsite: "",
   notes: "",
-  senderName: "Mandar",
-  senderCompany: "Acme",
-  senderOffer: "supply-chain visibility software for large retailers",
+  senderName: "",
+  senderCompany: "",
+  senderOffer: "",
 };
 
 type LiveSessionValue = {
