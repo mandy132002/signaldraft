@@ -20,13 +20,21 @@ export type EntityResolution = {
 };
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim() || "";
-/** llama-3.1-8b-instant was retired on Groq 2026-08-16 → use gpt-oss-20b */
+/**
+ * Default + fallbacks must be IDs still listed for this key on
+ * GET https://api.groq.com/openai/v1/models
+ *
+ * Retired (404 as of 2026-08-16 free/dev tier):
+ * - llama-3.1-8b-instant
+ * - llama-3.3-70b-versatile
+ * - qwen/qwen3-32b
+ */
 const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
 const GROQ_MODEL_FALLBACKS = [
   GROQ_MODEL,
   "openai/gpt-oss-20b",
-  "llama-3.3-70b-versatile",
-  "qwen/qwen3-32b",
+  "openai/gpt-oss-120b",
+  "qwen/qwen3.6-27b",
 ].filter((m, i, a) => a.indexOf(m) === i);
 
 export function llmModelName() {
@@ -47,6 +55,17 @@ type GroqChatOpts = {
   reasoning?: boolean;
 };
 
+type GroqOnceResult = {
+  content: string | null;
+  /** Try another approach / model */
+  retryable: boolean;
+  /** Do not retry the same model ID (404 / decommissioned) */
+  skipModel?: boolean;
+  /** Brief delay before next attempt (rate limits) */
+  retryAfterMs?: number;
+  reason?: string;
+};
+
 function pickMessageText(message?: {
   content?: string | null;
   reasoning?: string | null;
@@ -61,13 +80,31 @@ function pickMessageText(message?: {
   return null;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseRetryAfterMs(res: Response, body: string): number {
+  const header = res.headers.get("retry-after");
+  if (header) {
+    const sec = Number(header);
+    if (!Number.isNaN(sec) && sec > 0) return Math.min(8000, Math.round(sec * 1000));
+  }
+  const match = body.match(/try again in ([\d.]+)s/i);
+  if (match) {
+    const sec = Number(match[1]);
+    if (!Number.isNaN(sec) && sec > 0) return Math.min(8000, Math.round(sec * 1000));
+  }
+  return 1500;
+}
+
 async function groqChatOnce(
   model: string,
   system: string,
   user: string,
   temperature: number,
   opts: GroqChatOpts = {}
-): Promise<{ content: string | null; retryable: boolean; reason?: string }> {
+): Promise<GroqOnceResult> {
   const isOss = /gpt-oss/i.test(model);
   const maxTokens = opts.maxTokens ?? (isOss ? 4096 : 1200);
   const payload: Record<string, unknown> = {
@@ -99,11 +136,28 @@ async function groqChatOnce(
   if (!res.ok) {
     const text = await res.text();
     const modelGone = /model_not_found|does not exist|decommissioned/i.test(text);
+    const rateLimited = res.status === 429 || /rate_limit/i.test(text);
     const formatIssue = /response_format|json_object|json_validate|reasoning/i.test(text);
     console.error(`Groq error (${model})`, res.status, text);
+    if (modelGone) {
+      return {
+        content: null,
+        retryable: true,
+        skipModel: true,
+        reason: `model_not_found:${model}`,
+      };
+    }
+    if (rateLimited) {
+      return {
+        content: null,
+        retryable: true,
+        retryAfterMs: parseRetryAfterMs(res, text),
+        reason: "rate_limit_exceeded",
+      };
+    }
     return {
       content: null,
-      retryable: modelGone || formatIssue || res.status >= 500,
+      retryable: formatIssue || res.status >= 500,
       reason: text.slice(0, 160),
     };
   }
@@ -134,7 +188,18 @@ async function groqChat(system: string, user: string, temperature = 0.3): Promis
       const first = await groqChatOnce(model, system, user, temperature);
       if (first.content) return first.content;
 
-      // gpt-oss + JSON mode sometimes 400s or returns empty — retry same model without JSON constraint
+      // Retired / unknown model ID — do not burn another request on the same ID
+      if (first.skipModel) continue;
+
+      if (first.retryable && first.reason === "rate_limit_exceeded") {
+        await sleep(first.retryAfterMs ?? 1500);
+        const afterWait = await groqChatOnce(model, system, user, temperature);
+        if (afterWait.content) return afterWait.content;
+        // Still limited — try the next available model
+        continue;
+      }
+
+      // Empty content / JSON-mode quirks — retry same model without JSON constraint
       if (first.retryable) {
         const retry = await groqChatOnce(model, system, user, temperature, {
           json: false,
@@ -142,6 +207,10 @@ async function groqChat(system: string, user: string, temperature = 0.3): Promis
           maxTokens: 4096,
         });
         if (retry.content) return retry.content;
+        if (retry.skipModel) continue;
+        if (retry.reason === "rate_limit_exceeded") {
+          await sleep(retry.retryAfterMs ?? 1500);
+        }
       }
     }
     return null;

@@ -6,6 +6,8 @@ Auth: **Google sign-in** via Auth.js. Data: **MongoDB** (runs scoped to your Goo
 
 LLM: **Groq** (cloud). Set `GROQ_API_KEY` locally and on Vercel.
 
+**Full documentation:** [docs/PRODUCT.md](docs/PRODUCT.md) · printable PDF: [docs/SignalDraft-Documentation.pdf](docs/SignalDraft-Documentation.pdf)
+
 ## Manual setup (required once)
 
 ### 1. MongoDB Atlas
@@ -137,6 +139,8 @@ Click **Deploy**. After it finishes, open the Vercel URL, sign in with Google, r
 | **LLM analysis** | Groq → sentiment, business impact, outreach angle |
 | **Draft** | LLM writes a short sendable email |
 | Review | Approve / reject — **nothing is auto-sent** |
+
+> Groq model IDs change. If Logs show `model_not_found` on fallbacks, see [docs/RCA-GROQ-FAILURES.md](docs/RCA-GROQ-FAILURES.md).
 
 ## Edge cases
 

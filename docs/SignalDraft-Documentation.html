@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SignalDraft — Product Documentation</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 20mm 16mm;
+    }
+    :root {
+      --ink: #1f1e1d;
+      --muted: #5c574f;
+      --line: #d9d2c6;
+      --copper: #a84d30;
+      --paper: #fffcf8;
+      --soft: #f4efe6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      color: var(--ink);
+      background: white;
+      font-size: 11pt;
+      line-height: 1.45;
+      margin: 0;
+    }
+    h1, h2, h3, h4 {
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      page-break-after: avoid;
+    }
+    h1 {
+      font-size: 28pt;
+      margin: 0 0 6pt;
+      color: var(--ink);
+    }
+    h2 {
+      font-size: 16pt;
+      margin: 22pt 0 8pt;
+      padding-bottom: 4pt;
+      border-bottom: 1px solid var(--line);
+    }
+    h3 {
+      font-size: 12.5pt;
+      margin: 14pt 0 6pt;
+      color: var(--copper);
+    }
+    h4 {
+      font-size: 11pt;
+      margin: 10pt 0 4pt;
+    }
+    p { margin: 0 0 8pt; }
+    .eyebrow {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9pt;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--copper);
+      margin: 0 0 8pt;
+    }
+    .lede {
+      font-size: 12.5pt;
+      color: var(--muted);
+      max-width: 42em;
+      margin-bottom: 14pt;
+    }
+    .meta {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9pt;
+      color: var(--muted);
+      margin-bottom: 18pt;
+    }
+    .cover {
+      min-height: 240mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 24pt 8pt;
+      page-break-after: always;
+    }
+    .cover .box {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      padding: 28pt 24pt;
+      border-radius: 8pt;
+    }
+    ul, ol { margin: 0 0 10pt; padding-left: 1.25em; }
+    li { margin-bottom: 3pt; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 12pt;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 6pt 8pt;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--soft);
+      font-weight: 650;
+    }
+    code, .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9pt;
+    }
+    pre {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 6pt;
+      padding: 10pt 12pt;
+      overflow: hidden;
+      font-size: 8.5pt;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      page-break-inside: avoid;
+    }
+    .note {
+      background: var(--soft);
+      border-left: 3px solid var(--copper);
+      padding: 8pt 10pt;
+      margin: 10pt 0;
+      font-size: 10pt;
+    }
+    .toc a { color: var(--ink); text-decoration: none; }
+    .toc li { margin-bottom: 4pt; }
+    .page-break { page-break-before: always; }
+    .footer-note {
+      margin-top: 24pt;
+      padding-top: 10pt;
+      border-top: 1px solid var(--line);
+      font-size: 9pt;
+      color: var(--muted);
+    }
+    strong { font-weight: 650; }
+  </style>
+</head>
+<body>
+
+  <!-- COVER -->
+  <section class="cover">
+    <div class="box">
+      <p class="eyebrow">Product documentation</p>
+      <h1>SignalDraft</h1>
+      <p class="lede">
+        An SDR research → outreach drafting tool. Enter a prospect and company;
+        the app runs live public research, confirms the entity with Groq, and drafts a
+        short email for human review. Nothing is auto-sent.
+      </p>
+      <p class="meta">
+        Version: 1.0 · Stack: Next.js 15 · Auth.js · MongoDB Atlas · Groq<br />
+        Audience: builders, SDRs, and reviewers of this codebase<br />
+        Generated: 23 August 2026
+      </p>
+    </div>
+  </section>
+
+  <!-- TOC -->
+  <h2>Contents</h2>
+  <ol class="toc">
+    <li><a href="#overview">1. Product overview</a></li>
+    <li><a href="#problem">2. Problem statement</a></li>
+    <li><a href="#architecture">3. Architecture &amp; stack</a></li>
+    <li><a href="#pipeline">4. Research &amp; draft pipeline</a></li>
+    <li><a href="#features">5. Features by surface</a></li>
+    <li><a href="#edge">6. Edge cases</a></li>
+    <li><a href="#confidence">7. Draft confidence</a></li>
+    <li><a href="#setup">8. Local setup</a></li>
+    <li><a href="#deploy">9. Vercel deployment</a></li>
+    <li><a href="#gmail">10. Gmail drafts</a></li>
+    <li><a href="#api">11. API map</a></li>
+    <li><a href="#files">12. Key files</a></li>
+    <li><a href="#ops">13. Operations &amp; troubleshooting</a></li>
+  </ol>
+
+  <h2 id="overview">1. Product overview</h2>
+  <p>
+    <strong>SignalDraft</strong> helps an SDR research a named person at a named company and produce
+    a real first-touch email grounded in a checkable public hook. The output is the email the SDR
+    would send — not a pitch for SignalDraft itself.
+  </p>
+  <p>Core promise:</p>
+  <ul>
+    <li><strong>Live process, not a mock</strong> — Wikipedia, Google News RSS, Hacker News, Groq.</li>
+    <li><strong>Exact person + company</strong> — lookalikes and other-employer news are rejected.</li>
+    <li><strong>Human in the loop</strong> — approve / reject / refine; nothing is auto-sent.</li>
+    <li><strong>Prefer a hold over a wrong email</strong> — if no confirmed hook exists, hold.</li>
+  </ul>
+  <p>Surfaces in the app:</p>
+  <table>
+    <thead>
+      <tr><th>Surface</th><th>Route</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Live run</td><td><code>/</code></td><td>One prospect → research stages → draft → review</td></tr>
+      <tr><td>Bulk</td><td><code>/bulk</code></td><td>CSV upload, sequential research, review queue</td></tr>
+      <tr><td>Dashboard</td><td><code>/history</code></td><td>Saved runs, KPIs, edit / approve / Gmail</td></tr>
+      <tr><td>Login</td><td><code>/login</code></td><td>Google sign-in via Auth.js</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="problem">2. Problem statement</h2>
+  <p>
+    An SDR enters prospect details (e.g. Jeff Bezos at Amazon) and needs an outreach email that
+    cites a relevant public hook. Research is slow and error-prone when company names collide
+    (Cube Global vs Cube Logic) or when the person appears under another employer (Bezos / Blue Origin
+    while researching Amazon).
+  </p>
+  <p>SignalDraft automates:</p>
+  <ol>
+    <li>Public signal gathering</li>
+    <li>Exact-name ranking and Groq entity confirmation</li>
+    <li>Sentiment / impact analysis</li>
+    <li>A short cold email for human review</li>
+  </ol>
+
+  <h2 id="architecture" class="page-break">3. Architecture &amp; stack</h2>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Choice</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>App</td><td>Next.js 15 (App Router)</td><td>React 19, TypeScript</td></tr>
+      <tr><td>Auth</td><td>Auth.js (NextAuth v5) + Google OAuth</td><td>JWT sessions; MongoDB adapter for accounts</td></tr>
+      <tr><td>Data</td><td>MongoDB Atlas</td><td>Runs and bulk jobs scoped by <code>userId</code></td></tr>
+      <tr><td>LLM</td><td>Groq only</td><td>Default model <code>openai/gpt-oss-20b</code></td></tr>
+      <tr><td>Email drafts</td><td>Gmail API (optional)</td><td>Incremental <code>gmail.compose</code> scope</td></tr>
+      <tr><td>Hosting</td><td>Vercel</td><td>Edge-safe middleware via <code>getToken</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Auth layout (important for Vercel)</h3>
+  <ul>
+    <li><code>auth.config.ts</code> — Edge-safe config only (<code>providers: []</code>, authorized callback).</li>
+    <li><code>auth.ts</code> — Google provider + MongoDB adapter (Node runtime).</li>
+    <li><code>middleware.ts</code> — uses <code>getToken</code> from <code>next-auth/jwt</code> (avoids middleware crashes).</li>
+  </ul>
+
+  <h3>Data collections</h3>
+  <ul>
+    <li>Auth.js: <code>users</code>, <code>accounts</code>, <code>sessions</code>, …</li>
+    <li>App: <code>runs</code>, <code>bulk_jobs</code></li>
+  </ul>
+  <p class="note">Older local <code>data/runs.json</code> history is not migrated into MongoDB.</p>
+
+  <h2 id="pipeline">4. Research &amp; draft pipeline</h2>
+  <table>
+    <thead>
+      <tr><th>Stage</th><th>What happens</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Intake</td><td>Validate name + company; capture LinkedIn / notes / offer</td></tr>
+      <tr><td>Company + LinkedIn</td><td>Wikipedia snapshot (quoted exact name); optional LinkedIn context</td></tr>
+      <tr><td>News &amp; funding</td><td>Google News RSS (quoted company + soft tokens + offer themes)</td></tr>
+      <tr><td>Person signals</td><td>Person + company queries; HN (full company phrase)</td></tr>
+      <tr><td>Soft-rank</td><td>Score exact / soft / suspect / person; drop junk &amp; stale items</td></tr>
+      <tr><td>Groq entity match</td><td>LLM confirms which candidates are the right org / person</td></tr>
+      <tr><td>Groq analysis</td><td>Sentiment, business impact, outreach angle, risk flags</td></tr>
+      <tr><td>Draft</td><td>Short cold email + Low / Medium / High confidence</td></tr>
+      <tr><td>Review</td><td>Edit, refine, approve/reject, optional Gmail draft — not sent</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Matching rules (summary)</h3>
+  <ul>
+    <li>Multi-word companies are never shortened to the first token (no “Cube” for Cube Global).</li>
+    <li>A sendable hook must contain the <strong>exact company phrase</strong>.</li>
+    <li>Person-only stories about another employer cannot be the primary hook.</li>
+    <li>After Groq, a safety net drops “matches” missing the exact company name.</li>
+  </ul>
+
+  <h2 id="features" class="page-break">5. Features by surface</h2>
+
+  <h3>Live run (<code>/</code>)</h3>
+  <ul>
+    <li>Intake form (prospect, company, LinkedIn, sender, offer, notes).</li>
+    <li>Live stage timeline with per-step durations.</li>
+    <li>Signals list with match tier, eligible flag, sensitive flag.</li>
+    <li>Groq entity note + analysis cards.</li>
+    <li>Editable subject/body, Refine prompt, Approve / Reject, Gmail button.</li>
+    <li>Hold and sensitive callouts when applicable.</li>
+    <li>Session restore when switching to Dashboard and back.</li>
+  </ul>
+
+  <h3>Bulk (<code>/bulk</code>)</h3>
+  <ul>
+    <li>CSV template download; required columns: <code>fullName</code> (or <code>name</code>), <code>company</code>.</li>
+    <li>Optional: <code>title</code>, <code>linkedinUrl</code>, <code>notes</code>.</li>
+    <li>Up to 40 rows; processed one at a time.</li>
+    <li>Review queue with Approve / Reject / Gmail; Resume if a batch times out on Vercel.</li>
+  </ul>
+
+  <h3>Dashboard (<code>/history</code>)</h3>
+  <ul>
+    <li>KPIs: Runs, Emails stored, Needs review, Approved.</li>
+    <li>Loading skeletons (no flash of 0 / 0 / 0) while fetching.</li>
+    <li>Search, select a run, edit, store decision, copy, Gmail.</li>
+    <li>Shows draft confidence badge and reason.</li>
+  </ul>
+
+  <h2 id="edge">6. Edge cases</h2>
+  <p>
+    Full detail also lives in <code>docs/EDGE_CASES.md</code>. The pipeline prefers a <strong>hold</strong>
+    over inventing or guessing the wrong company.
+  </p>
+
+  <h3>6.1 Lookalike company names</h3>
+  <p><strong>Example:</strong> Cube Global vs CUBE / Cube Logic / Black Cube.</p>
+  <ul>
+    <li>Search and match the full quoted company phrase.</li>
+    <li><code>looksLikeWrongCompany</code> flags near-misses.</li>
+    <li>Post-LLM safety net drops matches without the exact phrase.</li>
+    <li>HN searches the full name, not the first token.</li>
+  </ul>
+
+  <h3>6.2 Person–company split</h3>
+  <p><strong>Example:</strong> Jeff Bezos / Amazon vs Blue Origin news.</p>
+  <ul>
+    <li>First and last name must appear near each other.</li>
+    <li>Sendable hook must name the target company.</li>
+    <li>If only other-employer stories exist → hold.</li>
+  </ul>
+
+  <h3>6.3 No confirmed public hook</h3>
+  <p><strong>Example:</strong> Low-coverage company with no exact-name news.</p>
+  <ul>
+    <li>Internal hold note (<code>HOLD — do not send</code>), not a fake outreach email.</li>
+    <li>Gmail and Refine disabled; Store hold still allowed for tracking.</li>
+  </ul>
+
+  <h3>6.4 Sensitive / negative news</h3>
+  <p><strong>Example:</strong> Layoffs, lawsuit, death, bankruptcy, data breach.</p>
+  <ul>
+    <li>Prefer a non-sensitive exact-company hook when one exists.</li>
+    <li>Otherwise: sober tone, risk flags, confidence capped at Medium, UI caution banner.</li>
+  </ul>
+
+  <h3>Residual risks</h3>
+  <ul>
+    <li>Single-token brands (Apple, Delta, Meta) can still collide — prefer legal names.</li>
+    <li>Very common names need a LinkedIn URL for safer identity.</li>
+    <li>Hooks older than ~18 months are dropped.</li>
+  </ul>
+
+  <h2 id="confidence" class="page-break">7. Draft confidence</h2>
+  <p>
+    Groq rates each drafted email as <strong>Low</strong>, <strong>Medium</strong>, or <strong>High</strong>,
+    with a one-line reason shown in Live, Dashboard, and Bulk.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Rating</th><th>Meaning</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>High</td><td>Hook clearly names this person or exact company; facts are in the research pack; offer bridge is natural</td></tr>
+      <tr><td>Medium</td><td>Company match is solid but the hook is thin/older or the offer link is inferred</td></tr>
+      <tr><td>Low</td><td>Weak, stale, or sensitive hook — or no confirmed entity (hold)</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Caps: sensitive hooks and auto-rewritten drafts cannot stay High. Holds stay Low.
+    Heuristic fallbacks (if Groq draft fails) use hook strength, not a model self-rating.
+  </p>
+
+  <h3>Groq entity check reliability</h3>
+  <p>
+    Entity check runs on Groq. The default model <code>openai/gpt-oss-20b</code> is a reasoning model;
+    earlier empty replies were caused by a small token budget spent on internal reasoning.
+    Current client uses a larger <code>max_completion_tokens</code> budget, low reasoning effort,
+    and fallbacks to other Groq models when the first reply is empty.
+  </p>
+
+  <h2 id="setup">8. Local setup</h2>
+
+  <h3>8.1 MongoDB Atlas</h3>
+  <ol>
+    <li>Create a free cluster at cloud.mongodb.com.</li>
+    <li>Database Access → user + password.</li>
+    <li>Network Access → allow <code>0.0.0.0/0</code> (or your IPs) for local + Vercel.</li>
+    <li>Copy the <code>mongodb+srv://…</code> URI; URL-encode special characters in the password.</li>
+  </ol>
+
+  <h3>8.2 Google OAuth</h3>
+  <ol>
+    <li>Google Cloud Console → OAuth client ID (Web application).</li>
+    <li>Origins: <code>http://localhost:3000</code></li>
+    <li>Redirect: <code>http://localhost:3000/api/auth/callback/google</code></li>
+  </ol>
+
+  <h3>8.3 Environment</h3>
+  <pre>cp .env.example .env.local
+openssl rand -base64 32   # → AUTH_SECRET</pre>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Value</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>AUTH_SECRET</code></td><td>Random secret</td></tr>
+      <tr><td><code>AUTH_URL</code></td><td><code>http://localhost:3000</code> (value only — no <code>AUTH_URL=</code> prefix)</td></tr>
+      <tr><td><code>GOOGLE_CLIENT_ID</code> / <code>SECRET</code></td><td>From Google Cloud</td></tr>
+      <tr><td><code>MONGODB_URI</code></td><td>Atlas connection string</td></tr>
+      <tr><td><code>MONGODB_DB</code></td><td><code>signaldraft</code></td></tr>
+      <tr><td><code>GROQ_API_KEY</code></td><td>From console.groq.com/keys</td></tr>
+      <tr><td><code>GROQ_MODEL</code></td><td><code>openai/gpt-oss-20b</code> (optional)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.4 Run</h3>
+  <pre>npm install
+npm run dev
+# open http://localhost:3000 → Continue with Google</pre>
+  <pre>npm test          # edge-case + confidence unit tests
+npm run build     # production build</pre>
+
+  <h2 id="deploy" class="page-break">9. Vercel deployment</h2>
+  <ol>
+    <li>Push the repo to GitHub; import as a Next.js project on Vercel.</li>
+    <li>Set the same env vars as local, with <code>AUTH_URL=https://YOUR_PROJECT.vercel.app</code>.</li>
+    <li>In Google OAuth, add the production origin and callback URL.</li>
+    <li>Deploy; sign in; run a Live draft.</li>
+  </ol>
+  <p class="note">
+    Production URL used in this project: <strong>https://signaldraft-sand.vercel.app</strong>.
+    Do not confuse with unrelated Vercel projects on similar domains.
+  </p>
+  <ul>
+    <li>Hobby function time limits: Live is fine; large Bulk jobs may need <strong>Resume remaining</strong>.</li>
+    <li>Atlas must allow Vercel egress (<code>0.0.0.0/0</code> is simplest for a personal project).</li>
+  </ul>
+
+  <h2 id="gmail">10. Gmail drafts</h2>
+  <p>
+    Login only requests email/profile. Gmail compose is requested later when the user clicks
+    <strong>Allow Gmail access</strong> / <strong>Add to Gmail drafts</strong>.
+  </p>
+  <ol>
+    <li>Enable <strong>Gmail API</strong> in Google Cloud.</li>
+    <li>OAuth consent: External, Testing; add yourself as a test user; add <code>gmail.compose</code> scope.</li>
+    <li>Unverified apps show a warning — Advanced → continue (normal for local/test).</li>
+  </ol>
+  <p>
+    Hold notes cannot be saved to Gmail (UI disabled; API rejects). Tokens are persisted in JWT +
+    MongoDB on sign-in so reconnect works under JWT session mode.
+  </p>
+
+  <h2 id="api">11. API map</h2>
+  <table>
+    <thead>
+      <tr><th>Route</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>/api/auth/[...nextauth]</code></td><td>Auth.js handlers (Node runtime)</td></tr>
+      <tr><td><code>/api/runs/start</code></td><td>Start live SSE pipeline</td></tr>
+      <tr><td><code>/api/runs</code></td><td>List runs for current user</td></tr>
+      <tr><td><code>/api/runs/[id]</code></td><td>Get / patch (approve, reject, save edits)</td></tr>
+      <tr><td><code>/api/runs/[id]/refine</code></td><td>Rewrite draft with SDR instructions</td></tr>
+      <tr><td><code>/api/bulk</code></td><td>Create / list bulk jobs</td></tr>
+      <tr><td><code>/api/bulk/[id]</code></td><td>Job detail</td></tr>
+      <tr><td><code>/api/bulk/[id]/process</code></td><td>Process / resume queue</td></tr>
+      <tr><td><code>/api/gmail/draft</code></td><td>Create Gmail draft</td></tr>
+      <tr><td><code>/api/health</code></td><td>Env / health debug</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="files" class="page-break">12. Key files</h2>
+  <table>
+    <thead>
+      <tr><th>Path</th><th>Responsibility</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>lib/pipeline.ts</code></td><td>Orchestrates stages for a live / bulk run</td></tr>
+      <tr><td><code>lib/research.ts</code></td><td>Wikipedia, Google News, HN fetch</td></tr>
+      <tr><td><code>lib/relevance.ts</code></td><td>Exact match, ranking, pickHook, soft candidates</td></tr>
+      <tr><td><code>lib/edge-cases.ts</code></td><td>Sensitive / hold helpers (client-safe)</td></tr>
+      <tr><td><code>lib/llm.ts</code></td><td>Groq chat, entity resolve, analysis, draft, refine</td></tr>
+      <tr><td><code>lib/draft.ts</code></td><td>resolveAndAnalyze, writeDraft, hold draft</td></tr>
+      <tr><td><code>lib/gmail.ts</code></td><td>Token refresh + Gmail draft create</td></tr>
+      <tr><td><code>auth.ts</code> / <code>auth.config.ts</code></td><td>Auth.js split for Edge vs Node</td></tr>
+      <tr><td><code>middleware.ts</code></td><td>Route protection via JWT</td></tr>
+      <tr><td><code>docs/EDGE_CASES.md</code></td><td>Edge-case writeup</td></tr>
+      <tr><td><code>lib/edge-cases.test.ts</code></td><td>Unit tests for the four edge cases + confidence</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="ops">13. Operations &amp; troubleshooting</h2>
+  <table>
+    <thead>
+      <tr><th>Symptom</th><th>Likely fix</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Groq entity check failed / heuristic only</td><td>Confirm <code>GROQ_API_KEY</code>; check logs for empty content / model errors; fallbacks should try other Groq models</td></tr>
+      <tr><td><code>model_not_found</code></td><td>Set <code>GROQ_MODEL=openai/gpt-oss-20b</code> (older instant models were retired)</td></tr>
+      <tr><td>Login 500 / wrong redirect</td><td><code>AUTH_URL</code> must be the bare URL (<code>https://…</code>), not <code>AUTH_URL=https://…</code></td></tr>
+      <tr><td>Middleware invocation failed</td><td>Keep Edge-safe middleware (<code>getToken</code>), providers only in <code>auth.ts</code></td></tr>
+      <tr><td>Gmail <code>access_denied</code></td><td>App in Testing + test user; do not publish unverified restricted scopes</td></tr>
+      <tr><td>Gmail API disabled</td><td>Enable Gmail API in the Google Cloud project</td></tr>
+      <tr><td>Wrong company in draft</td><td>Exact-match + safety net; prefer hold; add LinkedIn / notes and re-run</td></tr>
+      <tr><td>Dashboard shows empty zeros briefly</td><td>Fixed: loading skeletons until <code>/api/runs</code> returns</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Demo path</h3>
+  <ol>
+    <li>Sign in with Google.</li>
+    <li>Use Jeff Bezos / Amazon (or another public company).</li>
+    <li>Ensure <code>GROQ_API_KEY</code> is set.</li>
+    <li>Research &amp; draft email → narrate stages → open Source links.</li>
+    <li>Approve → open Dashboard (your runs only).</li>
+  </ol>
+
+  <div class="footer-note">
+    SignalDraft documentation · Confidential to the project owners · Not a send tool —
+    every outreach draft requires human review before use in a mailbox.
+  </div>
+
+</body>
+</html>
