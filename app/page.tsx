@@ -194,7 +194,7 @@ export default function HomePage() {
     <HomeBackdrop dimmed={workspaceActive} />
     <Shell>
       {!workspaceActive ? (
-        <div className="lede-intake" style={{ marginBottom: 28 }}>
+        <div className="lede-intake home-hero" style={{ marginBottom: 28 }}>
           <p
             style={{
               margin: "0 0 10px",
@@ -218,7 +218,6 @@ export default function HomePage() {
               letterSpacing: "-0.04em",
               margin: "0 0 12px",
               lineHeight: 1.1,
-              color: "var(--ink)",
             }}
           >
             Who are you writing to?
