@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Shell } from "../shell";
-import { ClaudeSpark } from "../ClaudeSpark";
 import { CSV_TEMPLATE, MAX_BULK_ROWS, prospectsFromCsv } from "@/lib/csv";
 import { bulkElapsedMs } from "@/lib/bulk-stats";
 import type { BulkJob } from "@/lib/types";
+import { useCompanyProfile } from "../CompanyProfile";
+import { ClaudeSpark } from "../ClaudeSpark";
+import { SenderContextFields } from "../SenderContext";
+import { Shell } from "../shell";
 
 function formatDuration(ms: number | null | undefined): string {
   if (ms == null || Number.isNaN(ms)) return "";
@@ -19,6 +21,7 @@ function formatDuration(ms: number | null | undefined): string {
 
 export default function BulkPage() {
   const router = useRouter();
+  const { profile, loaded: profileLoaded } = useCompanyProfile();
   const [fileName, setFileName] = useState("prospects.csv");
   const [csvText, setCsvText] = useState("");
   const [senderName, setSenderName] = useState("");
@@ -28,11 +31,19 @@ export default function BulkPage() {
   const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<BulkJob[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const preview = useMemo(() => {
     if (!csvText.trim()) return null;
     return prospectsFromCsv(csvText, { senderName, senderCompany, senderOffer });
   }, [csvText, senderName, senderCompany, senderOffer]);
+
+  useEffect(() => {
+    if (!profileLoaded) return;
+    setSenderName((v) => v.trim() || profile.senderName);
+    setSenderCompany((v) => v.trim() || profile.senderCompany);
+    setSenderOffer((v) => v.trim() || profile.senderOffer);
+  }, [profileLoaded, profile]);
 
   useEffect(() => {
     void (async () => {
@@ -146,19 +157,24 @@ export default function BulkPage() {
               Required columns: <code>fullName</code> (or name), <code>company</code>. Optional: title,
               linkedinUrl, companyWebsite, notes. Max {MAX_BULK_ROWS} rows.
             </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onFile(f);
+              }}
+            />
             <div className="bulk-drop-actions">
-              <label className="btn ghost bulk-file-btn">
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 Choose file
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  hidden
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void onFile(f);
-                  }}
-                />
-              </label>
+              </button>
               <button type="button" className="btn ghost" onClick={downloadTemplate}>
                 Download template
               </button>
@@ -179,15 +195,14 @@ export default function BulkPage() {
           <p className="hint" style={{ marginTop: 0 }}>
             Applied to every row unless the CSV has senderName / senderCompany / senderOffer columns.
           </p>
-          <label>Your name</label>
-          <input value={senderName} onChange={(e) => setSenderName(e.target.value)} />
-          <label>Your company</label>
-          <input value={senderCompany} onChange={(e) => setSenderCompany(e.target.value)} />
-          <label>What you sell</label>
-          <textarea
-            value={senderOffer}
-            onChange={(e) => setSenderOffer(e.target.value)}
-            placeholder="Brief description of your product or service"
+          <SenderContextFields
+            value={{ senderName, senderCompany, senderOffer }}
+            onChange={(next) => {
+              setSenderName(next.senderName);
+              setSenderCompany(next.senderCompany);
+              setSenderOffer(next.senderOffer);
+            }}
+            compactAction="Override this job"
           />
 
           <button className="btn" type="button" disabled={busy || !preview?.prospects.length} onClick={() => void startBulk()}>

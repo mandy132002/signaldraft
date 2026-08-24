@@ -52,6 +52,13 @@ export type ProspectInput = {
   senderOffer?: string;
 };
 
+/** Per-user SDR identity — name, company, and what you sell. Reused on Live and Bulk. */
+export type CompanyContext = {
+  senderName: string;
+  senderCompany: string;
+  senderOffer: string;
+};
+
 export type OutreachDraft = {
   subject: string;
   body: string;

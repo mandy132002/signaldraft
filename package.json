@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "npx tsx --test lib/edge-cases.test.ts lib/dashboard-filters.test.ts"
+    "test": "npx tsx --test lib/edge-cases.test.ts lib/dashboard-filters.test.ts lib/company-context.test.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.3",

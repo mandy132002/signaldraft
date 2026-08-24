@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listBulkJobs, upsertBulkJob } from "@/lib/bulk-db";
+import { applySavedCompanyContext } from "@/lib/company-context-db";
 import { prospectsFromCsv, MAX_BULK_ROWS } from "@/lib/csv";
 import { requireUserId } from "@/lib/session";
 import type { BulkJob, BulkItem } from "@/lib/types";
@@ -29,10 +30,16 @@ export async function POST(req: Request) {
     senderOffer?: string;
   };
 
+  const merged = await applySavedCompanyContext(gate.userId, {
+    senderName: body.senderName,
+    senderCompany: body.senderCompany,
+    senderOffer: body.senderOffer,
+  });
+
   const defaults = {
-    senderName: (body.senderName || "").trim() || "Alex",
-    senderCompany: (body.senderCompany || "").trim(),
-    senderOffer: (body.senderOffer || "").trim() || "our product",
+    senderName: (merged.senderName || "").trim() || "Alex",
+    senderCompany: (merged.senderCompany || "").trim(),
+    senderOffer: (merged.senderOffer || "").trim() || "our product",
   };
 
   const csvText = body.csvText || "";

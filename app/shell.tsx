@@ -40,6 +40,9 @@ export function Shell({
               <Link className={path === "/history" ? "active" : ""} href="/history">
                 Dashboard
               </Link>
+              <Link className={path.startsWith("/company") ? "active" : ""} href="/company">
+                Company
+              </Link>
             </nav>
             <ThemeToggle />
             <AuthMenu />

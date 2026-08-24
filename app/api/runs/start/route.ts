@@ -1,4 +1,5 @@
 import { executeRun } from "@/lib/pipeline";
+import { applySavedCompanyContextToProspect } from "@/lib/company-context-db";
 import { requireUserId } from "@/lib/session";
 import type { ProspectInput, RunRecord } from "@/lib/types";
 
@@ -9,9 +10,10 @@ export async function POST(req: Request) {
   const gate = await requireUserId();
   if ("error" in gate) return gate.error;
 
-  const prospect = (await req.json()) as ProspectInput;
+  const incoming = (await req.json()) as ProspectInput;
   const encoder = new TextEncoder();
   const { userId } = gate;
+  const prospect = await applySavedCompanyContextToProspect(userId, incoming);
 
   const stream = new ReadableStream({
     async start(controller) {

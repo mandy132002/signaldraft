@@ -6,6 +6,7 @@ import type { StageEvent } from "@/lib/types";
 import { ClaudeSpark } from "./ClaudeSpark";
 import { GmailDraftButton } from "./GmailDraftButton";
 import { RefineEmailBox } from "./RefineEmailBox";
+import { SenderContextFields } from "./SenderContext";
 import { SignalsCheck } from "./SignalsCheck";
 import { useLiveSession } from "./LiveSession";
 import { Shell } from "./shell";
@@ -279,16 +280,14 @@ export default function HomePage() {
             onChange={set("companyWebsite")}
             placeholder="https://company.com"
           />
-          <label>You (SDR) — name / your company</label>
-          <div className="row2">
-            <input value={form.senderName} onChange={set("senderName")} placeholder="Your name" />
-            <input value={form.senderCompany} onChange={set("senderCompany")} placeholder="Your company" />
-          </div>
-          <label>What you sell (goes in the email)</label>
-          <textarea
-            value={form.senderOffer}
-            onChange={set("senderOffer")}
-            placeholder="Brief description of your product or service"
+          <SenderContextFields
+            value={{
+              senderName: form.senderName || "",
+              senderCompany: form.senderCompany || "",
+              senderOffer: form.senderOffer || "",
+            }}
+            onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+            compactAction="Override this run"
           />
           <label>Notes (optional)</label>
           <textarea value={form.notes} onChange={set("notes")} placeholder="Optional context for research" />

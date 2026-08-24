@@ -7,6 +7,8 @@ declare global {
   var _runsIndexesReady: boolean | undefined;
   // eslint-disable-next-line no-var
   var _bulkIndexesReady: boolean | undefined;
+  // eslint-disable-next-line no-var
+  var _companyContextIndexesReady: boolean | undefined;
 }
 
 function requireUri() {
@@ -48,4 +50,11 @@ export async function ensureBulkIndexes(db: Db) {
   await col.createIndex({ id: 1 }, { unique: true });
   await col.createIndex({ userId: 1, createdAt: -1 });
   global._bulkIndexesReady = true;
+}
+
+export async function ensureCompanyContextIndexes(db: Db) {
+  if (global._companyContextIndexesReady) return;
+  const col = db.collection("company_context");
+  await col.createIndex({ userId: 1 }, { unique: true });
+  global._companyContextIndexesReady = true;
 }

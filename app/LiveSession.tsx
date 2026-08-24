@@ -1,8 +1,15 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import {
+  EMPTY_COMPANY_CONTEXT,
+  companyContextEquals,
+  hasCompanyContext,
+  mergeCompanyContext,
+} from "@/lib/company-context";
 import type { ProspectInput, RunRecord } from "@/lib/types";
+import { useCompanyProfile } from "./CompanyProfile";
 
 const STORAGE_KEY = "signaldraft.liveSession.v1";
 const USER_KEY = "signaldraft.liveUserId.v1";
@@ -85,6 +92,7 @@ function clearStored(userId?: string | null) {
 export function LiveSessionProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const userId = session?.user?.id ?? null;
+  const { profile, loaded: profileLoaded } = useCompanyProfile();
 
   const [form, setForm] = useState<ProspectInput>(defaultProspect);
   const [run, setRun] = useState<RunRecord | null>(null);
@@ -94,6 +102,11 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   const [busy, setBusy] = useState(false);
   const [clientStartedAt, setClientStartedAt] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+  const lastSyncedProfile = useRef(EMPTY_COMPANY_CONTEXT);
+
+  useEffect(() => {
+    lastSyncedProfile.current = EMPTY_COMPANY_CONTEXT;
+  }, [userId]);
 
   const wipeLive = useCallback(() => {
     setForm(defaultProspect);
@@ -191,9 +204,40 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
     };
   }, [status, userId, wipeLive]);
 
+  // Fill sender fields from the saved company profile when blank or still matching the last synced profile
+  useEffect(() => {
+    if (!ready || !profileLoaded || status !== "authenticated") return;
+    setForm((f) => {
+      const current = {
+        senderName: f.senderName || "",
+        senderCompany: f.senderCompany || "",
+        senderOffer: f.senderOffer || "",
+      };
+      const untouched =
+        !hasCompanyContext(current) || companyContextEquals(current, lastSyncedProfile.current);
+      const next = untouched
+        ? {
+            ...f,
+            senderName: profile.senderName,
+            senderCompany: profile.senderCompany,
+            senderOffer: profile.senderOffer,
+          }
+        : mergeCompanyContext(f, profile);
+      lastSyncedProfile.current = profile;
+      if (
+        next.senderName === f.senderName &&
+        next.senderCompany === f.senderCompany &&
+        next.senderOffer === f.senderOffer
+      ) {
+        return f;
+      }
+      return next;
+    });
+  }, [ready, profileLoaded, status, profile]);
+
   // Persist for this user after hydrate (same login session only)
   useEffect(() => {
-    if (!ready || !userId || status !== "authenticated") return;
+    if (!ready || !profileLoaded || !userId || status !== "authenticated") return;
     writeStored(userId, {
       form,
       runId: run?.id ?? null,
@@ -201,7 +245,7 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
       body,
       note,
     });
-  }, [ready, userId, status, form, run?.id, subject, body, note]);
+  }, [ready, profileLoaded, userId, status, form, run?.id, subject, body, note]);
 
   const refreshRun = useCallback(async () => {
     if (!run?.id || busy) return;
@@ -228,9 +272,21 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const resetSession = useCallback(() => {
-    wipeLive();
+    setForm({
+      ...defaultProspect,
+      senderName: profile.senderName,
+      senderCompany: profile.senderCompany,
+      senderOffer: profile.senderOffer,
+    });
+    lastSyncedProfile.current = profile;
+    setRun(null);
+    setSubject("");
+    setBody("");
+    setNote("");
+    setBusy(false);
+    setClientStartedAt(null);
     clearStored(userId);
-  }, [wipeLive, userId]);
+  }, [profile, userId]);
 
   const value = useMemo(
     () => ({
