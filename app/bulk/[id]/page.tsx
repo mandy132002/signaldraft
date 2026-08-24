@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Shell } from "../../shell";
 import { ClaudeSpark } from "../../ClaudeSpark";
+import { ClarifyPanel } from "../../ClarifyPanel";
 import { GmailDraftButton } from "../../GmailDraftButton";
 import { RefineEmailBox } from "../../RefineEmailBox";
 import { bulkElapsedMs, summarizeBulk } from "@/lib/bulk-stats";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { BulkJob, BulkItem, RunRecord } from "@/lib/types";
 
-type Summary = { total: number; done: number; failed: number; pending: number; running: number };
+type Summary = { total: number; done: number; failed: number; pending: number; running: number; needsInput?: number };
 
 function formatDuration(ms: number | null | undefined): string {
   if (ms == null || Number.isNaN(ms)) return "—";
@@ -112,7 +113,10 @@ export default function BulkJobPage() {
           if (payload.type === "item_start" && payload.prospect) {
             setLiveLabel(`Researching ${payload.prospect.fullName} · ${payload.prospect.company}`);
           }
-          if ((payload.type === "run_update" || payload.type === "item_done") && payload.run) {
+          if (payload.type === "item_needs_input" && payload.prospect) {
+            setLiveLabel(`Paused — confirm workplace for ${payload.prospect.fullName}`);
+          }
+          if ((payload.type === "run_update" || payload.type === "item_done" || payload.type === "item_needs_input") && payload.run) {
             setRuns((prev) => {
               const idx = prev.findIndex((r) => r.id === payload.run!.id);
               if (idx >= 0) {
@@ -162,10 +166,13 @@ export default function BulkJobPage() {
         if (!cancelled) {
           const latest = await refresh();
           const still = latest?.items.some((i) => i.status === "pending");
+          const waiting = latest?.items.some((i) => i.status === "needs_input");
           setLiveLabel(
             still
               ? "Paused — click Resume to continue"
-              : "All prospects processed — review drafts below"
+              : waiting
+                ? "Some rows need a workplace check — answer below, then research continues"
+                : "All prospects processed — review drafts below"
           );
         }
       } finally {
@@ -195,14 +202,14 @@ export default function BulkJobPage() {
     const out: RunRecord[] = [];
     for (const item of job?.items || []) {
       const run = matchRun(item, runs);
-      if (run?.draft && (run.status === "needs_review" || run.status === "approved" || run.status === "rejected")) {
+      if (run && (run.status === "needs_input" || run.draft) && (run.status === "needs_input" || run.status === "needs_review" || run.status === "approved" || run.status === "rejected")) {
         linked.add(run.id);
         out.push(run);
       }
     }
     for (const run of runs) {
       if (linked.has(run.id)) continue;
-      if (run.draft && (run.status === "needs_review" || run.status === "approved" || run.status === "rejected")) {
+      if (run.status === "needs_input" || (run.draft && (run.status === "needs_review" || run.status === "approved" || run.status === "rejected"))) {
         out.push(run);
       }
     }
@@ -210,12 +217,13 @@ export default function BulkJobPage() {
   }, [job?.items, runs]);
 
   const toReviewCount = useMemo(
-    () => reviewRuns.filter((r) => r.status === "needs_review").length,
+    () => reviewRuns.filter((r) => r.status === "needs_review" || r.status === "needs_input").length,
     [reviewRuns]
   );
 
   const selected =
     reviewRuns.find((r) => r.id === selectedRunId) ||
+    reviewRuns.find((r) => r.status === "needs_input") ||
     reviewRuns.find((r) => r.status === "needs_review") ||
     reviewRuns[0];
 
@@ -256,8 +264,11 @@ export default function BulkJobPage() {
       }
       const latest = await refresh();
       const still = latest?.items.some((i) => i.status === "pending");
+      const waiting = latest?.items.some((i) => i.status === "needs_input");
       setLiveLabel(
-        still ? "Paused — click Resume to continue" : "All prospects processed — review drafts below"
+        still ? "Paused — click Resume to continue" : waiting
+          ? "Some rows need a workplace check — answer below, then research continues"
+          : "All prospects processed — review drafts below"
       );
     } finally {
       setProcessing(false);
@@ -378,7 +389,7 @@ export default function BulkJobPage() {
                   <button
                     type="button"
                     className={`bulk-queue-item ${active ? "active" : ""} ${item.status}`}
-                    disabled={!run?.draft}
+                    disabled={!run}
                     onClick={() => run && setSelectedRunId(run.id)}
                   >
                     <span className="bulk-q-name">
@@ -398,7 +409,31 @@ export default function BulkJobPage() {
         </aside>
 
         <section className="card bulk-editor">
-          {selected?.draft ? (
+          {selected?.status === "needs_input" ? (
+            <ClarifyPanel
+              run={selected}
+              disabled={processing || acting}
+              onBusy={setActing}
+              onRun={(next) => {
+                setRuns((prev) => {
+                  const idx = prev.findIndex((r) => r.id === next.id);
+                  if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = next;
+                    return copy;
+                  }
+                  return [...prev, next];
+                });
+                if (next.draft) {
+                  setSubject(next.draft.subject);
+                  setBody(next.draft.body);
+                }
+                if (next.status !== "needs_input") {
+                  void refresh();
+                }
+              }}
+            />
+          ) : selected?.draft ? (
             <>
               <div className="stages-header">
                 <h2 style={{ margin: 0 }}>

@@ -49,6 +49,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "status must be approved or rejected to store the email" }, { status: 400 });
   }
 
+  if (run.status === "needs_input") {
+    return NextResponse.json(
+      { error: "Answer the workplace question before storing this run." },
+      { status: 409 }
+    );
+  }
+
   if (!run.draft) {
     run.draft = {
       subject: body.subject ?? "",

@@ -76,20 +76,37 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
               { bulkJobId: job!.id }
             );
             const finishedAt = new Date().toISOString();
-            item.status = run.status === "failed" ? "failed" : "done";
-            item.runId = run.id;
-            item.error = run.error;
-            item.updatedAt = finishedAt;
-            item.durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
-            job!.updatedAt = finishedAt;
-            await upsertBulkJob(job!);
-            send({
-              type: "item_done",
-              index: item.index,
-              run,
-              job,
-              summary: summarizeBulk(job!),
-            });
+            if (run.status === "needs_input") {
+              item.status = "needs_input";
+              item.runId = run.id;
+              item.error = undefined;
+              item.updatedAt = finishedAt;
+              item.durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+              job!.updatedAt = finishedAt;
+              await upsertBulkJob(job!);
+              send({
+                type: "item_needs_input",
+                index: item.index,
+                run,
+                job,
+                summary: summarizeBulk(job!),
+              });
+            } else {
+              item.status = run.status === "failed" ? "failed" : "done";
+              item.runId = run.id;
+              item.error = run.error;
+              item.updatedAt = finishedAt;
+              item.durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+              job!.updatedAt = finishedAt;
+              await upsertBulkJob(job!);
+              send({
+                type: "item_done",
+                index: item.index,
+                run,
+                job,
+                summary: summarizeBulk(job!),
+              });
+            }
           } catch (e) {
             const finishedAt = new Date().toISOString();
             item.status = "failed";
@@ -110,7 +127,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         }
 
         const left = job!.items.some((i) => i.status === "pending");
-        if (!left) {
+        const waiting = job!.items.some((i) => i.status === "needs_input");
+        if (!left && !waiting) {
           job!.status = "completed";
           job!.completedAt = new Date().toISOString();
           job!.updatedAt = job!.completedAt;

@@ -625,6 +625,7 @@ button {
 }
 .dot.done { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .dot.error { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+.dot.paused { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .dot.pending { background: var(--paper-3); }
 .stage-label { font-weight: 650; font-size: 14px; letter-spacing: -0.01em; }
 .stage-detail { color: var(--muted); font-size: 13px; margin-top: 3px; line-height: 1.45; }
@@ -774,7 +775,7 @@ button {
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
-.badge.needs_review, .badge.running {
+.badge.needs_review, .badge.running, .badge.needs_input {
   color: var(--warn);
   background: var(--warn-soft);
   border-color: transparent;
@@ -837,6 +838,42 @@ button {
   background: var(--warn-soft);
   color: var(--ink);
   border: 1px solid rgba(166, 124, 45, 0.22);
+}
+.callout.clarify {
+  background: var(--copper-soft);
+  color: var(--ink);
+  border: 1px solid rgba(201, 100, 66, 0.22);
+}
+
+.clarify-card {
+  margin-bottom: 16px;
+}
+.clarify-field {
+  margin-top: 4px;
+}
+.clarify-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.clarify-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--lift-soft);
+  color: var(--ink);
+  margin: 0;
+  width: auto;
+}
+.clarify-chip:hover:not(:disabled) {
+  background: var(--hover-lift);
+}
+.clarify-chip.active {
+  border-color: var(--copper);
+  background: var(--copper-soft);
 }
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }

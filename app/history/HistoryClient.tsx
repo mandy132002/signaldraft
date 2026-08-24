@@ -15,6 +15,7 @@ import {
 import type { RunRecord } from "@/lib/types";
 import { Shell } from "../shell";
 import { ClaudeSpark } from "../ClaudeSpark";
+import { ClarifyPanel } from "../ClarifyPanel";
 import { GmailDraftButton } from "../GmailDraftButton";
 import { RefineEmailBox } from "../RefineEmailBox";
 import { SignalsCheck } from "../SignalsCheck";
@@ -102,7 +103,7 @@ export default function HistoryClient() {
 
   const kpis = useMemo(() => {
     const withEmail = runs.filter((r) => r.status === "approved" || r.status === "rejected").length;
-    const review = runs.filter((r) => r.status === "needs_review").length;
+    const review = runs.filter((r) => r.status === "needs_review" || r.status === "needs_input").length;
     const approved = runs.filter((r) => r.status === "approved").length;
     return { total: runs.length, withEmail, review, approved };
   }, [runs]);
@@ -434,6 +435,8 @@ export default function HistoryClient() {
                           <span className={`badge ${r.status}`}>{r.status.replace("_", " ")}</span>
                           {r.status === "approved" || r.status === "rejected" ? (
                             <span className="run-status-note ok">email stored</span>
+                          ) : r.status === "needs_input" ? (
+                            <span className="run-status-note">waiting on you</span>
                           ) : r.draft?.body ? (
                             <span className="run-status-note">awaiting decision</span>
                           ) : null}
@@ -452,7 +455,7 @@ export default function HistoryClient() {
                       </td>
                       <td>
                         <span className="run-subject" title={r.draft?.subject ?? r.error ?? undefined}>
-                          {r.draft?.subject ?? r.error ?? "—"}
+                          {r.draft?.subject ?? r.clarify?.reason ?? r.error ?? "—"}
                         </span>
                       </td>
                     </tr>
@@ -557,7 +560,21 @@ export default function HistoryClient() {
               </div>
             </header>
 
-            {!selected.draft ? (
+            {selected.status === "needs_input" ? (
+              <ClarifyPanel
+                run={selected}
+                disabled={saving || refining}
+                onBusy={setSaving}
+                onRun={(next) => {
+                  setRuns((prev) => prev.map((r) => (r.id === next.id ? next : r)));
+                  if (next.draft) {
+                    setEditSubject(next.draft.subject);
+                    setEditBody(next.draft.body);
+                    applyServerDraft(next.id, next.draft.subject, next.draft.body);
+                  }
+                }}
+              />
+            ) : !selected.draft ? (
               <p className="hint" style={{ marginTop: 0 }}>
                 This run has no email draft (likely no confirmed hook).
               </p>

@@ -1,6 +1,31 @@
-export type RunStatus = "running" | "succeeded" | "failed" | "needs_review" | "approved" | "rejected";
+export type RunStatus =
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "needs_input"
+  | "needs_review"
+  | "approved"
+  | "rejected";
 
-export type StageStatus = "pending" | "running" | "done" | "error";
+export type StageStatus = "pending" | "running" | "paused" | "done" | "error";
+
+export type ClarifyField = "linkedinUrl" | "companyWebsite" | "company" | "notes";
+
+export type ClarifyQuestion = {
+  id: string;
+  field: ClarifyField;
+  prompt: string;
+  placeholder?: string;
+  suggestions?: string[];
+};
+
+export type ClarifyRequest = {
+  reason: string;
+  questions: ClarifyQuestion[];
+  askedAt: string;
+  round: number;
+  answeredAt?: string;
+};
 
 export type SignalKind =
   | "news"
@@ -102,9 +127,11 @@ export type RunRecord = {
   draft?: OutreachDraft;
   error?: string;
   reviewNote?: string;
+  /** Set when the pipeline pauses to ask the SDR to disambiguate the workplace. */
+  clarify?: ClarifyRequest;
 };
 
-export type BulkItemStatus = "pending" | "running" | "done" | "failed" | "skipped";
+export type BulkItemStatus = "pending" | "running" | "needs_input" | "done" | "failed" | "skipped";
 
 export type BulkJobStatus = "queued" | "running" | "completed" | "cancelled";
 

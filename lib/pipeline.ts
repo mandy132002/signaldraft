@@ -1,8 +1,10 @@
 import { resolveAndAnalyze, llmModelName, writeDraft } from "./draft";
-import { mergeWorkplaceContext } from "./company-site";
+import { buildClarifyRequest } from "./clarify";
+import { loadCompanyWebsiteContext, mergeWorkplaceContext } from "./company-site";
 import { upsertRun } from "./db";
+import { loadLinkedInContext } from "./linkedin";
 import { researchProspect } from "./research";
-import type { ProspectInput, RunRecord, StageEvent } from "./types";
+import type { ProspectInput, RunRecord, StageEvent, StageStatus } from "./types";
 
 export type PipelineListener = (run: RunRecord) => void;
 
@@ -35,7 +37,7 @@ function stages(): StageEvent[] {
   }));
 }
 
-function setStage(run: RunRecord, id: string, status: StageEvent["status"], detail: string) {
+function setStage(run: RunRecord, id: string, status: StageStatus, detail: string) {
   const stamp = now();
   run.stages = run.stages.map((s) => {
     if (s.id !== id) return s;
@@ -43,10 +45,9 @@ function setStage(run: RunRecord, id: string, status: StageEvent["status"], deta
       return { ...s, status, detail, at: stamp, startedAt: stamp, durationMs: undefined };
     }
     let durationMs = s.durationMs;
-    if ((status === "done" || status === "error") && s.startedAt) {
+    if ((status === "done" || status === "error" || status === "paused") && s.startedAt) {
       durationMs = Math.max(0, Date.parse(stamp) - Date.parse(s.startedAt));
-    } else if ((status === "done" || status === "error") && !s.startedAt) {
-      // instantaneous stage (never marked running) — tiny tick
+    } else if ((status === "done" || status === "error" || status === "paused") && !s.startedAt) {
       durationMs = s.status === "running" && s.at ? Math.max(0, Date.parse(stamp) - Date.parse(s.at)) : 0;
     }
     return { ...s, status, detail, at: stamp, durationMs };
@@ -58,26 +59,39 @@ export async function executeRun(
   prospect: ProspectInput,
   onUpdate: PipelineListener,
   userId: string,
-  opts?: { bulkJobId?: string }
+  opts?: { bulkJobId?: string; existing?: RunRecord; skipClarify?: boolean }
 ): Promise<RunRecord> {
-  const run: RunRecord = {
-    id: newId(),
-    userId,
-    bulkJobId: opts?.bulkJobId,
-    createdAt: now(),
-    updatedAt: now(),
-    status: "running",
-    prospect,
-    stages: stages(),
-    signals: [],
-  };
+  const resuming = Boolean(opts?.existing);
+  const run: RunRecord = opts?.existing
+    ? {
+        ...opts.existing,
+        userId,
+        bulkJobId: opts.bulkJobId ?? opts.existing.bulkJobId,
+        prospect,
+        status: "running",
+        error: undefined,
+        updatedAt: now(),
+      }
+    : {
+        id: newId(),
+        userId,
+        bulkJobId: opts?.bulkJobId,
+        createdAt: now(),
+        updatedAt: now(),
+        status: "running",
+        prospect,
+        stages: stages(),
+        signals: [],
+      };
   await upsertRun(run);
   onUpdate(run);
 
   try {
-    setStage(run, "intake", "running", `${prospect.fullName} · ${prospect.title} · ${prospect.company}`);
-    onUpdate(run);
-    await sleep(200);
+    if (!resuming) {
+      setStage(run, "intake", "running", `${prospect.fullName} · ${prospect.title} · ${prospect.company}`);
+      onUpdate(run);
+      await sleep(200);
+    }
     if (!prospect.fullName.trim() || !prospect.company.trim()) {
       throw new Error("Prospect name and company are required.");
     }
@@ -94,13 +108,35 @@ export async function executeRun(
     onUpdate(run);
 
     setStage(run, "company", "running", `Wikipedia + LinkedIn / company website for "${prospect.company}".`);
+    onUpdate(run);
+
+    const [linkedIn, companySite] = await Promise.all([
+      loadLinkedInContext(prospect),
+      loadCompanyWebsiteContext(prospect),
+    ]);
+
+    const skipClarify = Boolean(opts?.skipClarify) || (run.clarify?.round ?? 0) >= 1;
+    const clarify = skipClarify
+      ? null
+      : buildClarifyRequest(prospect, linkedIn, companySite, run.clarify?.round ?? 0);
+
+    if (clarify) {
+      run.clarify = clarify;
+      run.status = "needs_input";
+      setStage(run, "company", "paused", clarify.reason);
+      run.updatedAt = now();
+      await upsertRun(run);
+      onUpdate(run);
+      return run;
+    }
+
     setStage(run, "news", "running", `News search (quoted + soft tokens).`);
     setStage(run, "hiring", "running", `Person / workplace signals.`);
     onUpdate(run);
 
-    const { signals: softRanked, notes, kept, dropped, linkedIn, companySite } =
-      await researchProspect(prospect);
-    const workplace = mergeWorkplaceContext(linkedIn, companySite);
+    const { signals: softRanked, notes, kept, dropped, linkedIn: liUsed, companySite: siteUsed } =
+      await researchProspect(prospect, { linkedIn, companySite });
+    const workplace = mergeWorkplaceContext(liUsed, siteUsed);
 
     const wiki = softRanked.find((s) => s.kind === "company");
     setStage(
@@ -109,8 +145,8 @@ export async function executeRun(
       "done",
       [
         wiki ? wiki.title : "No Wikipedia / site page.",
-        linkedIn ? `LinkedIn: ${linkedIn.vanity || linkedIn.url}` : "No LinkedIn.",
-        companySite ? `Site: ${companySite.host}` : "No company website.",
+        liUsed ? `LinkedIn: ${liUsed.vanity || liUsed.url}` : "No LinkedIn.",
+        siteUsed ? `Site: ${siteUsed.host}` : "No company website.",
       ].join(" · ")
     );
     setStage(
@@ -226,7 +262,9 @@ export async function executeRun(
     run.error = message;
     run.status = "failed";
     run.stages = run.stages.map((s) =>
-      s.status === "running" ? { ...s, status: "error", detail: message, at: now() } : s
+      s.status === "running" || s.status === "paused"
+        ? { ...s, status: "error" as const, detail: message, at: now() }
+        : s
     );
     run.updatedAt = now();
     await upsertRun(run);

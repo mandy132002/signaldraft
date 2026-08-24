@@ -51,6 +51,7 @@ function sameProspect(a: BulkItem["prospect"], b: RunRecord["prospect"]) {
 function terminalFromRun(status: RunStatus): BulkItem["status"] {
   if (status === "failed") return "failed";
   if (status === "running") return "running";
+  if (status === "needs_input") return "needs_input";
   return "done";
 }
 
@@ -108,7 +109,7 @@ export function reconcileBulkJob(job: BulkJob, runs: RunRecord[]): { job: BulkJo
   let status = job.status;
   let completedAt = job.completedAt;
   const allDone = items.every((i) => i.status === "done" || i.status === "failed" || i.status === "skipped");
-  const anyPending = items.some((i) => i.status === "pending" || i.status === "running");
+  const anyPending = items.some((i) => i.status === "pending" || i.status === "running" || i.status === "needs_input");
 
   if (allDone && job.status !== "completed" && job.status !== "cancelled") {
     status = "completed";

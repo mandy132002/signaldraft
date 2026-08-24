@@ -7,6 +7,7 @@ export function summarizeBulk(job: BulkJob) {
     failed: job.items.filter((i) => i.status === "failed").length,
     pending: job.items.filter((i) => i.status === "pending").length,
     running: job.items.filter((i) => i.status === "running").length,
+    needsInput: job.items.filter((i) => i.status === "needs_input").length,
   };
 }
 
@@ -14,7 +15,7 @@ export function bulkElapsedMs(job: BulkJob, nowMs = Date.now()): number | null {
   const start = job.startedAt || job.createdAt;
   if (!start) return null;
   if (job.completedAt) return Math.max(0, Date.parse(job.completedAt) - Date.parse(start));
-  if (job.status === "running" || job.items.some((i) => i.status === "running" || i.status === "pending")) {
+  if (job.status === "running" || job.items.some((i) => i.status === "running" || i.status === "pending" || i.status === "needs_input")) {
     return Math.max(0, nowMs - Date.parse(start));
   }
   const last = job.items.reduce((max, i) => Math.max(max, Date.parse(i.updatedAt || job.updatedAt)), 0);

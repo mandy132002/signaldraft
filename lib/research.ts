@@ -219,7 +219,11 @@ export async function hnMentions(
 export { pickHook };
 
 export async function researchProspect(
-  input: ProspectInput
+  input: ProspectInput,
+  preloaded?: {
+    linkedIn?: Awaited<ReturnType<typeof loadLinkedInContext>>;
+    companySite?: Awaited<ReturnType<typeof loadCompanyWebsiteContext>>;
+  }
 ): Promise<{
   signals: RankedSignal[];
   notes: string[];
@@ -232,10 +236,12 @@ export async function researchProspect(
   const phrase = exactCompanyPhrase(input.company);
   const qCompany = quoted(phrase);
   const personQuoted = quoted(input.fullName.trim());
-  const [linkedIn, companySite] = await Promise.all([
-    loadLinkedInContext(input),
-    loadCompanyWebsiteContext(input),
-  ]);
+  const linkedIn =
+    preloaded && "linkedIn" in preloaded ? preloaded.linkedIn ?? null : await loadLinkedInContext(input);
+  const companySite =
+    preloaded && "companySite" in preloaded
+      ? preloaded.companySite ?? null
+      : await loadCompanyWebsiteContext(input);
   const workplace = mergeWorkplaceContext(linkedIn, companySite);
   const liTokens = linkedInHintTokens(linkedIn?.vanity || parseLinkedInUrl(input.linkedinUrl)?.vanity);
   const workplacePhrases = [

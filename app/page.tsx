@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { StageEvent } from "@/lib/types";
 import { ClaudeSpark } from "./ClaudeSpark";
+import { ClarifyPanel } from "./ClarifyPanel";
 import { GmailDraftButton } from "./GmailDraftButton";
 import { RefineEmailBox } from "./RefineEmailBox";
 import { SenderContextFields } from "./SenderContext";
 import { SignalsCheck } from "./SignalsCheck";
 import { useLiveSession } from "./LiveSession";
+import { consumeRunStream } from "./run-stream";
 import { Shell } from "./shell";
 
 function formatDuration(ms: number): string {
@@ -109,43 +111,26 @@ export default function HomePage() {
     const started = Date.now();
     setClientStartedAt(started);
     setNowMs(started);
-    const res = await fetch("/api/runs/start", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const reader = res.body?.getReader();
-    if (!reader) {
-      setBusy(false);
-      return;
-    }
-    const decoder = new TextDecoder();
-    let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const chunks = buf.split("\n\n");
-      buf = chunks.pop() ?? "";
-      for (const chunk of chunks) {
-        const line = chunk.replace(/^data:\s*/, "");
-        if (!line) continue;
-        try {
-          const payload = JSON.parse(line) as { run?: import("@/lib/types").RunRecord };
-          if (payload.run) {
-            setRun(payload.run);
-            setNowMs(Date.now());
-            if (payload.run.draft) {
-              setSubject(payload.run.draft.subject);
-              setBody(payload.run.draft.body);
-            }
-          }
-        } catch {
-          /* ignore partial JSON */
+    try {
+      const res = await fetch("/api/runs/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      await consumeRunStream(res, (next) => {
+        setRun(next);
+        setNowMs(Date.now());
+        if (next.draft) {
+          setSubject(next.draft.subject);
+          setBody(next.draft.body);
         }
-      }
+        if (next.prospect) {
+          setForm((f) => ({ ...f, ...next.prospect }));
+        }
+      });
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   async function review(status: "approved" | "rejected") {
@@ -175,6 +160,7 @@ export default function HomePage() {
   const liveLabel = useMemo(() => {
     if (!ready) return "Restoring last session…";
     if (busy) return "Researching live…";
+    if (run?.status === "needs_input") return "Paused — confirm the workplace, then we continue";
     if (run?.draft && isHoldDraft(run.draft)) return "Hold — no confirmed hook to send";
     if (run?.status === "needs_review" && (run.draft?.sensitiveHook || (run.chosenSignal && signalIsSensitive(run.chosenSignal))))
       return "Draft ready — sensitive hook, review carefully";
@@ -353,6 +339,23 @@ export default function HomePage() {
               })}
             </ul>
           </div>
+
+          {run?.status === "needs_input" ? (
+            <ClarifyPanel
+              run={run}
+              disabled={busy}
+              onBusy={setBusy}
+              onRun={(next) => {
+                setRun(next);
+                setNowMs(Date.now());
+                if (next.draft) {
+                  setSubject(next.draft.subject);
+                  setBody(next.draft.body);
+                }
+              }}
+              onProspect={(prospect) => setForm((f) => ({ ...f, ...prospect }))}
+            />
+          ) : null}
 
           {run?.signals?.length ? (
             <SignalsCheck key={run.id} signals={run.signals} chosenId={chosenId} />
