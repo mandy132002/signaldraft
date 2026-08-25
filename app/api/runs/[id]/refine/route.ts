@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRun, upsertRun } from "@/lib/db";
+import { recordRefineMemory, retrieveDraftMemory } from "@/lib/draft-memory-db";
 import { llmAvailable, refineDraft } from "@/lib/llm";
 import { requireUserId } from "@/lib/session";
 
@@ -43,6 +44,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "No current email body to refine" }, { status: 400 });
   }
 
+  const memory = await retrieveDraftMemory(gate.userId, run.prospect).catch(() => undefined);
   const refined = await refineDraft({
     prospect: run.prospect,
     hook,
@@ -50,6 +52,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     currentSubject,
     currentBody,
     refinePrompt: prompt,
+    memory,
   });
 
   if (!refined) {
@@ -63,6 +66,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     ...refined,
     hook: run.draft?.hook ?? refined.hook,
   };
+  run.lastRefinePrompt = prompt;
   if (run.status === "approved" || run.status === "rejected") {
     run.status = "needs_review";
   } else if (run.status !== "failed") {
@@ -70,6 +74,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   run.updatedAt = new Date().toISOString();
   await upsertRun(run);
+  try {
+    await recordRefineMemory(run, prompt);
+  } catch (err) {
+    console.error("recordRefineMemory failed", err);
+  }
 
   return NextResponse.json({ run, refinementPrompt: prompt });
 }

@@ -10,6 +10,7 @@ import {
 } from "./llm";
 import type { LinkedInContext } from "./linkedin";
 import { offerFit } from "./offer";
+import { summarizeMemoryUse, type MemoryPack } from "./draft-memory";
 import { isAmbiguousCompanyName, mentionsCompanyExact, pickHook, type RankedSignal } from "./relevance";
 import type { OutreachDraft, ProspectInput, Signal } from "./types";
 
@@ -73,13 +74,14 @@ function selectHook(
   signals: Signal[],
   prospect: ProspectInput,
   preferredId?: string | null,
-  linkedIn?: LinkedInContext | null
+  linkedIn?: LinkedInContext | null,
+  memory?: MemoryPack | null
 ): Signal | undefined {
   const ranked = signals as RankedSignal[];
   const preferred = preferredId
     ? ranked.find((s) => s.id === preferredId && isSafeSendableHook(s, prospect, linkedIn))
     : undefined;
-  const best = pickHook(ranked, prospect, linkedIn);
+  const best = pickHook(ranked, prospect, linkedIn, memory);
   if (!preferred) return best;
   if (!best || preferred.id === best.id) return preferred;
 
@@ -182,7 +184,8 @@ ${fromLine}`;
 export async function resolveAndAnalyze(
   prospect: ProspectInput,
   ranked: Signal[],
-  linkedIn?: LinkedInContext | null
+  linkedIn?: LinkedInContext | null,
+  memory?: MemoryPack | null
 ): Promise<{
   signals: Signal[];
   hook: Signal | undefined;
@@ -196,7 +199,7 @@ export async function resolveAndAnalyze(
   let preferredHookId: string | null = null;
 
   if (up) {
-    const resolution = await resolveEntities(prospect, ranked, linkedIn);
+    const resolution = await resolveEntities(prospect, ranked, linkedIn, memory);
     if (resolution) {
       signals = applyEntityResolution(ranked, resolution, prospect, linkedIn);
       entityNote = resolution.note;
@@ -244,10 +247,12 @@ export async function resolveAndAnalyze(
     });
   }
 
-  const hook = selectHook(signals, prospect, preferredHookId, linkedIn);
+  const hook = selectHook(signals, prospect, preferredHookId, linkedIn, memory);
   if (hook && preferredHookId && hook.id !== preferredHookId) {
     entityNote = `${entityNote} · Hook switched to offer-aligned signal.`;
   }
+  const memNote = summarizeMemoryUse(memory || { approved: [], collisions: [], rejectedHooks: [], tones: [] });
+  if (memNote) entityNote = `${entityNote} · ${memNote}`;
   if (
     !hook &&
     isAmbiguousCompanyName(prospect.company) &&
@@ -259,7 +264,7 @@ export async function resolveAndAnalyze(
 
   if (!up) return { signals, hook, analysis: null, llm: false, entityNote };
 
-  const analysis = await analyzeHook(prospect, hook, signals, linkedIn);
+  const analysis = await analyzeHook(prospect, hook, signals, linkedIn, memory);
   return { signals, hook, analysis, llm: true, entityNote };
 }
 
@@ -267,22 +272,23 @@ export async function writeDraft(
   prospect: ProspectInput,
   ranked: Signal[],
   analysis?: HookAnalysis | null,
-  linkedIn?: LinkedInContext | null
+  linkedIn?: LinkedInContext | null,
+  memory?: MemoryPack | null
 ): Promise<OutreachDraft> {
-  const hook = pickHook(ranked as RankedSignal[], prospect, linkedIn);
+  const hook = pickHook(ranked as RankedSignal[], prospect, linkedIn, memory);
   if (!hook) {
     return noHookDraft(prospect);
   }
 
   if (analysis && (await llmAvailable())) {
-    const drafted = await draftEmail(prospect, hook, ranked, analysis, linkedIn);
+    const drafted = await draftEmail(prospect, hook, ranked, analysis, linkedIn, memory);
     if (drafted) return drafted;
   }
 
   if (!analysis && (await llmAvailable())) {
-    const a = await analyzeHook(prospect, hook, ranked, linkedIn);
+    const a = await analyzeHook(prospect, hook, ranked, linkedIn, memory);
     if (a) {
-      const drafted = await draftEmail(prospect, hook, ranked, a, linkedIn);
+      const drafted = await draftEmail(prospect, hook, ranked, a, linkedIn, memory);
       if (drafted) return drafted;
       return heuristicDraft(prospect, hook, a);
     }

@@ -259,6 +259,34 @@ describe("same-name companies — LinkedIn workplace", () => {
     assert.equal(mentionsLinkedInWorkplace(wrong.title, linkedIn), false);
     assert.equal(pickHook([wrong, right], colin, linkedIn)?.id, "right");
   });
+
+  it("downranks a hook that repeats a rejected lookalike", () => {
+    const colin: ProspectInput = {
+      fullName: "Colin Ross",
+      title: "Delivery Manager",
+      company: "Cube",
+      senderOffer: "agentic testing",
+    };
+    const collision = signal({
+      id: "collision",
+      title: "Cube Logistics raises Series B",
+      relevance: 0.9,
+      matchTier: "exact",
+    });
+    const keep = signal({
+      id: "keep",
+      title: "Cube ships a new analytics API",
+      relevance: 0.7,
+      matchTier: "exact",
+    });
+    assert.equal(pickHook([collision, keep], colin)?.id, "collision");
+    assert.equal(
+      pickHook([collision, keep], colin, undefined, {
+        collisions: [{ collisionNames: ["Cube Logistics"] }],
+      })?.id,
+      "keep"
+    );
+  });
 });
 
 describe("company website workplace", () => {

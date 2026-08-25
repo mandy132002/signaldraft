@@ -129,6 +129,8 @@ export type RunRecord = {
   reviewNote?: string;
   /** Set when the pipeline pauses to ask the SDR to disambiguate the workplace. */
   clarify?: ClarifyRequest;
+  /** Last AI refine instruction — stored into review memory when you approve. */
+  lastRefinePrompt?: string;
 };
 
 export type BulkItemStatus = "pending" | "running" | "needs_input" | "done" | "failed" | "skipped";

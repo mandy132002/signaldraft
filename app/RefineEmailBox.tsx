@@ -80,7 +80,6 @@ export function RefineEmailBox({
           <span className="btn-inner">
             <ClaudeSpark size={18} />
             <span>Refine with AI</span>
-            <span className="ai-refine-badge">Groq</span>
           </span>
         </button>
       ) : (
@@ -88,7 +87,6 @@ export function RefineEmailBox({
           <div className="refine-panel-head">
             <ClaudeSpark size={18} />
             <span className="refine-panel-title">AI refinement</span>
-            <span className="ai-refine-badge">Groq</span>
           </div>
           <label>What should change?</label>
           <textarea

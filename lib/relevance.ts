@@ -600,6 +600,21 @@ export function isSoftCandidate(
   return distinctiveCompanyTokens(company).some((t) => wordMatch(text, t));
 }
 
+function signalHitsCollisionMemory(
+  signal: Pick<Signal, "title" | "summary">,
+  memory: { collisions?: { collisionNames?: string[]; hookTitle?: string }[] }
+): boolean {
+  const blob = `${signal.title} ${signal.summary}`;
+  for (const m of memory.collisions || []) {
+    for (const name of m.collisionNames || []) {
+      if (name.length >= 4 && wordMatch(blob, name)) return true;
+    }
+    const prior = (m.hookTitle || "").trim();
+    if (prior.length >= 12 && wordMatch(blob, prior)) return true;
+  }
+  return false;
+}
+
 /**
  * Prefer hooks that are (1) about this person+company, (2) LinkedIn workplace when
  * the company name is ambiguous, (3) relevant to what we sell, (4) high score.
@@ -612,7 +627,8 @@ export function pickHook(
     employerHints?: string[];
     domainHints?: string[];
     employerMatchesCompany?: boolean | null;
-  } | null
+  } | null,
+  memory?: { collisions?: { collisionNames?: string[]; hookTitle?: string }[] } | null
 ): RankedSignal | undefined {
   const eligible = ranked.filter((s) => s.eligible && s.kind !== "company");
   if (!eligible.length) return undefined;
@@ -649,6 +665,7 @@ export function pickHook(
       if (s.matchTier === "person") score += 0.05;
       if (s.matchTier === "suspect") score -= 0.08;
       if (s.sensitive) score -= 0.12;
+      if (memory && signalHitsCollisionMemory(s, memory)) score -= 0.22;
     }
     return { s, score };
   });

@@ -1,5 +1,6 @@
 import type { LinkedInContext } from "./linkedin";
 import { isSensitiveHook } from "./edge-cases";
+import { formatMemoryForPrompt, type MemoryPack } from "./draft-memory";
 import { mentionsCompanyExact, exactCompanyPhrase, isAmbiguousCompanyName, mentionsLinkedInWorkplace } from "./relevance";
 import type { OutreachDraft, ProspectInput, Signal } from "./types";
 
@@ -18,6 +19,11 @@ export type EntityResolution = {
   note: string;
   rejected: { id: string; reason: string }[];
 };
+
+function memoryPromptBlock(memory?: MemoryPack | null): string {
+  const text = memory ? formatMemoryForPrompt(memory) : "";
+  return text ? `\n${text}\n` : "";
+}
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim() || "";
 /**
@@ -324,7 +330,8 @@ function packResearch(
 export async function resolveEntities(
   prospect: ProspectInput,
   candidates: Signal[],
-  linkedIn?: LinkedInContext | null
+  linkedIn?: LinkedInContext | null,
+  memory?: MemoryPack | null
 ): Promise<EntityResolution | null> {
   const pool = candidates.filter((s) => s.kind !== "company").slice(0, 12);
   if (!pool.length) {
@@ -355,7 +362,7 @@ PERSON vs COMPANY:
 HOOK CHOICE — you are helping an SDR sell: "${prospect.senderOffer?.trim() || "their product"}"
 - chosenHookId must be a confirmed match AND the best bridge to that offer (themes, pain, timing).
 - Prefer hooks where the news implies a need related to the offer over unrelated celebrity/PR fluff.
-- If two hooks match equally on entity, pick the one more relevant to the offer.`;
+- If two hooks match equally on entity, pick the one more relevant to the offer.${memoryPromptBlock(memory)}`;
 
   const user = `TARGET PERSON: ${prospect.fullName}
 TARGET TITLE: ${prospect.title}
@@ -530,7 +537,8 @@ export async function analyzeHook(
   prospect: ProspectInput,
   hook: Signal,
   ranked: Signal[],
-  linkedIn?: LinkedInContext | null
+  linkedIn?: LinkedInContext | null,
+  memory?: MemoryPack | null
 ): Promise<HookAnalysis | null> {
   const pack = packResearch(prospect, hook, ranked, linkedIn);
   const system = `You are a B2B sales research analyst preparing notes for a cold email TO ${prospect.fullName} (second person: you/your).
@@ -551,7 +559,7 @@ ${JSON.stringify(pack, null, 2)}
 PRIMARY HOOK (must drive the email — about ${prospect.company}):
 "${hook.title}"
 ${hook.summary}
-
+${memoryPromptBlock(memory)}
 Return JSON:
 {
   "sentiment": "positive" | "neutral" | "negative" | "mixed",
@@ -839,7 +847,8 @@ export async function draftEmail(
   hook: Signal,
   ranked: Signal[],
   analysis: HookAnalysis,
-  linkedIn?: LinkedInContext | null
+  linkedIn?: LinkedInContext | null,
+  memory?: MemoryPack | null
 ): Promise<OutreachDraft | null> {
   const first = prospect.fullName.trim().split(/\s+/)[0] || prospect.fullName;
   const sender = prospect.senderName?.trim() || "Alex";
@@ -887,7 +896,7 @@ ANALYSIS (hints only — rewrite into second-person email copy; discard any thir
 ${JSON.stringify(analysis, null, 2)}
 
 LinkedIn / website: ${linkedIn?.headline || linkedIn?.vanity || prospect.linkedinUrl || prospect.companyWebsite || "none"}
-
+${memoryPromptBlock(memory)}
 BAD (never produce this style):
 "Hi Colin,
 
@@ -992,8 +1001,9 @@ export async function refineDraft(input: {
   currentSubject: string;
   currentBody: string;
   refinePrompt: string;
+  memory?: MemoryPack | null;
 }): Promise<OutreachDraft | null> {
-  const { prospect, hook, analysis, currentSubject, currentBody, refinePrompt } = input;
+  const { prospect, hook, analysis, currentSubject, currentBody, refinePrompt, memory } = input;
   const first = prospect.fullName.trim().split(/\s+/)[0] || prospect.fullName;
   const sender = prospect.senderName?.trim() || "Alex";
   const senderCo = prospect.senderCompany?.trim() || "";
@@ -1033,7 +1043,7 @@ ${currentBody}
 
 SDR REFINEMENT INSTRUCTIONS (priority):
 ${instruction}
-
+${memoryPromptBlock(memory)}
 Rules:
 - subject ≤6 words; body ≤90 words; real newlines
 - ALWAYS start with "Hi ${first}," and end with the signature

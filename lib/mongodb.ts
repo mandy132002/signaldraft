@@ -9,6 +9,8 @@ declare global {
   var _bulkIndexesReady: boolean | undefined;
   // eslint-disable-next-line no-var
   var _companyContextIndexesReady: boolean | undefined;
+  // eslint-disable-next-line no-var
+  var _draftMemoryIndexesReady: boolean | undefined;
 }
 
 function requireUri() {
@@ -57,4 +59,12 @@ export async function ensureCompanyContextIndexes(db: Db) {
   const col = db.collection("company_context");
   await col.createIndex({ userId: 1 }, { unique: true });
   global._companyContextIndexesReady = true;
+}
+
+export async function ensureDraftMemoryIndexes(db: Db) {
+  if (global._draftMemoryIndexesReady) return;
+  const col = db.collection("draft_memory");
+  await col.createIndex({ userId: 1, createdAt: -1 });
+  await col.createIndex({ userId: 1, runId: 1, kind: 1 }, { unique: true });
+  global._draftMemoryIndexesReady = true;
 }

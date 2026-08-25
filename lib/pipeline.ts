@@ -3,6 +3,7 @@ import { buildClarifyRequest } from "./clarify";
 import { loadCompanyWebsiteContext, mergeWorkplaceContext } from "./company-site";
 import { upsertRun } from "./db";
 import { loadLinkedInContext } from "./linkedin";
+import { retrieveDraftMemory } from "./draft-memory-db";
 import { researchProspect } from "./research";
 import type { ProspectInput, RunRecord, StageEvent, StageStatus } from "./types";
 
@@ -182,10 +183,18 @@ export async function executeRun(
     );
     onUpdate(run);
 
+    const memory = await retrieveDraftMemory(userId, prospect).catch(() => ({
+      approved: [],
+      collisions: [],
+      rejectedHooks: [],
+      tones: [],
+    }));
+
     const { signals, hook, analysis, llm, entityNote } = await resolveAndAnalyze(
       prospect,
       softRanked,
-      workplace
+      workplace,
+      memory
     );
     run.signals = signals.filter((s) => s.eligible || s.kind === "company" || s.matchTier === "suspect");
     run.chosenSignal = hook;
@@ -236,7 +245,7 @@ export async function executeRun(
       llm ? `Drafting with ${llmModelName()}…` : "Writing draft (heuristic)."
     );
     onUpdate(run);
-    run.draft = await writeDraft(prospect, signals, analysis, workplace);
+    run.draft = await writeDraft(prospect, signals, analysis, workplace, memory);
     if (run.draft.hold) {
       setStage(run, "draft", "done", `HOLD — no confirmed hook · ${run.draft.holdReason || "do not send"}`);
       setStage(

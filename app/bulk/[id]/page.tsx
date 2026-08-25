@@ -525,6 +525,11 @@ export default function BulkJobPage() {
               ) : (
                 <p className="hint">Already {selected.status}. Pick another prospect in the queue.</p>
               )}
+              {selected.status === "needs_review" && selected.draft && !isHoldDraft(selected.draft) ? (
+                <p className="hint">
+                  Approve or reject is remembered for later drafts (hooks, lookalikes, refine tone).
+                </p>
+              ) : null}
               <div style={{ marginTop: 10 }}>
                 {selected.draft && isHoldDraft(selected.draft) ? (
                   <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>

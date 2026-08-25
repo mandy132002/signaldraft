@@ -668,6 +668,11 @@ export default function HistoryClient() {
                   </button>
                 </div>
               ) : null}
+              {selected.status === "needs_review" && selected.draft && !isHoldDraft(selected.draft) ? (
+                <p className="hint">
+                  Approve or reject is remembered for later drafts (hooks, lookalikes, refine tone).
+                </p>
+              ) : null}
               <div className="actions">
                 {dirty ? (
                   <button

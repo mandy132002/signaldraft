@@ -479,6 +479,12 @@ export default function HomePage() {
                       Reject & store
                     </button>
                   </div>
+                  {run.draft && !isHoldDraft(run.draft) ? (
+                    <p className="hint">
+                      Approve or reject is remembered for the next run — winning hooks, lookalikes you flagged, and
+                      refine tone.
+                    </p>
+                  ) : null}
                   {run.draft && isHoldDraft(run.draft) ? (
                     <p className="hint">Gmail is disabled — this hold is not an outreach email.</p>
                   ) : (

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordDecisionMemory } from "@/lib/draft-memory-db";
 import { getRun, upsertRun } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 
@@ -73,5 +74,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   run.status = body.status!;
   run.updatedAt = new Date().toISOString();
   await upsertRun(run);
+  try {
+    await recordDecisionMemory(run, body.status!, body.reviewNote);
+  } catch (err) {
+    console.error("recordDecisionMemory failed", err);
+  }
   return NextResponse.json({ run });
 }
