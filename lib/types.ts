@@ -157,7 +157,7 @@ export type BulkJob = {
   updatedAt: string;
   /** When the first prospect started processing */
   startedAt?: string;
-  /** When every item reached a terminal status */
+  /** When the first CSV pass finished (done / failed / skipped / needs_input). Workplace checks are later. */
   completedAt?: string;
   status: BulkJobStatus;
   fileName: string;

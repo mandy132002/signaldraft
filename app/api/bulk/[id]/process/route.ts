@@ -127,10 +127,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         }
 
         const left = job!.items.some((i) => i.status === "pending");
-        const waiting = job!.items.some((i) => i.status === "needs_input");
-        if (!left && !waiting) {
+        if (!left) {
           job!.status = "completed";
-          job!.completedAt = new Date().toISOString();
+          job!.completedAt = job!.completedAt || new Date().toISOString();
           job!.updatedAt = job!.completedAt;
           await upsertBulkJob(job!);
         }

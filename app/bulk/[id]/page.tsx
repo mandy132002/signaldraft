@@ -8,7 +8,7 @@ import { ClaudeSpark } from "../../ClaudeSpark";
 import { ClarifyPanel } from "../../ClarifyPanel";
 import { GmailDraftButton } from "../../GmailDraftButton";
 import { RefineEmailBox } from "../../RefineEmailBox";
-import { bulkElapsedMs, summarizeBulk } from "@/lib/bulk-stats";
+import { bulkElapsedMs, bulkStillProcessing, summarizeBulk } from "@/lib/bulk-stats";
 import { isHoldDraft, signalIsSensitive } from "@/lib/edge-cases";
 import type { BulkJob, BulkItem, RunRecord } from "@/lib/types";
 
@@ -37,8 +37,7 @@ function matchRun(item: BulkItem, runs: RunRecord[]): RunRecord | undefined {
 }
 
 function queueLabel(item: BulkItem, run?: RunRecord): string {
-  if (run?.status) return run.status.replace("_", " ");
-  return item.status;
+  return (run?.status || item.status).replaceAll("_", " ");
 }
 
 export default function BulkJobPage() {
@@ -148,9 +147,16 @@ export default function BulkJobPage() {
       const j = await refresh();
       if (cancelled || !j) return;
 
-      const needsWork = j.items.some((i) => i.status === "pending" || i.status === "running");
+      const needsWork = bulkStillProcessing(j.items);
       if (!needsWork) {
-        setLiveLabel(j.status === "completed" ? "All prospects processed" : "Ready to review");
+        const waiting = j.items.some((i) => i.status === "needs_input");
+        setLiveLabel(
+          waiting
+            ? "First pass done — some rows need a workplace check (you can answer later)"
+            : j.status === "completed"
+              ? "All prospects processed"
+              : "Ready to review"
+        );
         return;
       }
 
@@ -171,7 +177,7 @@ export default function BulkJobPage() {
             still
               ? "Paused — click Resume to continue"
               : waiting
-                ? "Some rows need a workplace check — answer below, then research continues"
+                ? "First pass done — some rows need a workplace check (you can answer later)"
                 : "All prospects processed — review drafts below"
           );
         }
@@ -184,14 +190,11 @@ export default function BulkJobPage() {
     };
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live clock while job is in progress
+  // Live clock while first-pass processing is in progress (not while waiting on needs_input)
   useEffect(() => {
     if (!job) return;
-    const active =
-      processing ||
-      job.status === "running" ||
-      job.items.some((i) => i.status === "pending" || i.status === "running");
-    if (!active && job.completedAt) return;
+    const active = processing || bulkStillProcessing(job.items);
+    if (!active) return;
     const t = window.setInterval(() => setNowMs(Date.now()), 250);
     return () => window.clearInterval(t);
   }, [job, processing]);
@@ -242,13 +245,13 @@ export default function BulkJobPage() {
     setNote(selected.reviewNote || "");
   }, [selected?.id]);
 
+  const processedCount = summary ? summary.done + summary.failed + (summary.needsInput ?? 0) : 0;
   const progressPct = summary
-    ? Math.round(((summary.done + summary.failed) / Math.max(summary.total, 1)) * 100)
+    ? Math.round((processedCount / Math.max(summary.total, 1)) * 100)
     : 0;
 
   const totalMs = job ? bulkElapsedMs(job, nowMs) : null;
-  const canResume =
-    !processing && Boolean(job?.items.some((i) => i.status === "pending" || i.status === "running"));
+  const canResume = !processing && Boolean(job && bulkStillProcessing(job.items));
 
   async function resume() {
     if (processing || !job) return;
@@ -267,7 +270,7 @@ export default function BulkJobPage() {
       const waiting = latest?.items.some((i) => i.status === "needs_input");
       setLiveLabel(
         still ? "Paused — click Resume to continue" : waiting
-          ? "Some rows need a workplace check — answer below, then research continues"
+          ? "First pass done — some rows need a workplace check (you can answer later)"
           : "All prospects processed — review drafts below"
       );
     } finally {
@@ -367,7 +370,7 @@ export default function BulkJobPage() {
       </div>
       <p className="hint">
         {progressPct}% complete
-        {summary ? ` · ${summary.done + summary.failed} of ${summary.total}` : ""}
+        {summary ? ` · ${processedCount} of ${summary.total}` : ""}
         {totalMs != null ? ` · ${formatDuration(totalMs)} elapsed` : ""}
       </p>
 

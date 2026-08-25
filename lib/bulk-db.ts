@@ -1,7 +1,8 @@
 import type { BulkJob, BulkItem, RunRecord, RunStatus } from "./types";
+import { bulkStillProcessing } from "./bulk-stats";
 import { ensureBulkIndexes, getDb } from "./mongodb";
 
-export { summarizeBulk, bulkElapsedMs } from "./bulk-stats";
+export { summarizeBulk, bulkElapsedMs, bulkStillProcessing } from "./bulk-stats";
 
 async function bulkCollection() {
   const db = await getDb();
@@ -108,14 +109,14 @@ export function reconcileBulkJob(job: BulkJob, runs: RunRecord[]): { job: BulkJo
 
   let status = job.status;
   let completedAt = job.completedAt;
-  const allDone = items.every((i) => i.status === "done" || i.status === "failed" || i.status === "skipped");
-  const anyPending = items.some((i) => i.status === "pending" || i.status === "running" || i.status === "needs_input");
+  const stillWorking = bulkStillProcessing(items);
 
-  if (allDone && job.status !== "completed" && job.status !== "cancelled") {
+  if (!stillWorking && job.status !== "completed" && job.status !== "cancelled") {
     status = "completed";
-    completedAt = stamp;
+    completedAt =
+      items.reduce((latest, i) => (i.updatedAt > latest ? i.updatedAt : latest), job.startedAt || job.createdAt) || stamp;
     changed = true;
-  } else if (anyPending && job.status === "completed") {
+  } else if (stillWorking && job.status === "completed") {
     status = "running";
     completedAt = undefined;
     changed = true;

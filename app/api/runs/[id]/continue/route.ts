@@ -96,10 +96,9 @@ async function syncBulkItem(userId: string, run: RunRecord) {
     };
   });
   const pending = job.items.some((i) => i.status === "pending" || i.status === "running");
-  const waiting = job.items.some((i) => i.status === "needs_input");
-  if (!pending && !waiting && job.status !== "cancelled") {
+  if (!pending && job.status !== "cancelled") {
     job.status = "completed";
-    job.completedAt = stamp;
+    if (!job.completedAt) job.completedAt = stamp;
   }
   job.updatedAt = stamp;
   await upsertBulkJob(job);

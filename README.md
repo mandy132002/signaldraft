@@ -124,7 +124,7 @@ Click **Deploy**. After it finishes, open the Vercel URL, sign in with Google, r
 ## Bulk CSV
 
 1. Open **Bulk** in the nav (or [/bulk](http://localhost:3000/bulk)).
-2. Download the template (or use `public/signaldraft-prospects.csv`).
+2. Download the template (or use `public/signaldraft-prospects.csv`). For a full happy-path + edge-case pack, use `public/signaldraft-test-cases.csv` (case/expected columns are labels only — Bulk ignores them).
 3. Required columns: `fullName` (or `name`), `company`. Optional: `title`, `linkedinUrl`, `companyWebsite`, `notes`.
 4. Set your sender defaults → start research (up to 40 rows, one-at-a-time).
 5. Review drafts in the queue → **Approve & store** / **Reject & store**.

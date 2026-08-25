@@ -764,6 +764,8 @@ button {
 .badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 500;
@@ -1669,6 +1671,17 @@ tr.selected-row td { border-bottom-color: rgba(201, 100, 66, 0.35); }
   border-color: rgba(201, 100, 66, 0.45);
   background: #fff8f3;
   box-shadow: 0 0 0 3px var(--copper-soft);
+}
+.bulk-queue-item .badge {
+  flex-shrink: 0;
+  align-self: center;
+  text-align: center;
+  justify-content: center;
+  line-height: 1.25;
+}
+.bulk-queue-item .badge.needs_input {
+  max-width: 4.6rem;
+  white-space: normal;
 }
 .bulk-q-name {
   display: flex;

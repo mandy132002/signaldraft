@@ -1,0 +1,32 @@
+fullName,title,company,linkedinUrl,companyWebsite,notes,case,expected
+Satya Nadella,CEO,Microsoft,,,Happy path — large public company with frequent exact-name news,happy_public_company,"Draft. Microsoft is long enough that this should not pause. Hook must say Microsoft. Approve to store review memory."
+Marc Benioff,CEO,Salesforce,,,Happy path — product and earnings coverage,happy_public_company,"Draft. Salesforce should not pause. Exact company phrase on the hook."
+Jensen Huang,CEO,NVIDIA,,https://www.nvidia.com,Happy path — product/chip news. Website so a short brand does not pause,happy_with_website,"Draft. No mid-run pause (website present). Hook about NVIDIA not a lookalike."
+Patrick Collison,CEO,Stripe,,https://stripe.com,Happy path — product/funding coverage,happy_with_website,Draft with a checkable Stripe hook. Review confidence.
+Brian Chesky,CEO,Airbnb,,https://www.airbnb.com,Happy path — consumer brand with regular news,happy_with_website,Draft. Airbnb is a short name; website should skip the pause.
+Tim Cook,CEO,Apple,,https://www.apple.com,"Happy path — short brand (Apple vs Apple Bank / apple fruit). Website disambiguates.",happy_short_brand_with_site,"Draft. Prefer Apple Inc news. Fruit/bank lookalikes never the hook."
+Reed Hastings,"Co-Founder, Director",Netflix,,https://www.netflix.com,CSV quoted title contains a comma,happy_quoted_title,"Parses as one title field. Draft if a Netflix hook confirms."
+Santhosh Chandrashekar,CEO,Cube Global,,,"Lookalike companies — news will also return CUBE, Cube Logic, Black Cube. Target is Cube Global only.",edge1_lookalike_pause,"PAUSE (Cube is collision-prone). Continue anyway → lookalikes stay suspect; never the chosen hook. HOLD if no exact Cube Global news."
+Santhosh Chandrashekar,CEO,Cube Global,,,"Warehouse / supply-chain Cube Global. Not Cube Logic, CUBE crypto, or Black Cube.",edge1_lookalike_with_notes,"PAUSE then research. Notes help Groq reject lookalikes. HOLD if still no exact match."
+Colin Ross,Delivery Manager,Cube,,,Same short name — many Cubes (cube.dev vs Cube Logistics vs others),edge1_short_brand_pause,"PAUSE and ask for website or a more specific name. Continue anyway may HOLD."
+Colin Ross,Delivery Manager,Cube,,https://cube.dev,Same short name with company website — workplace source of truth,edge1_short_brand_with_site,"Should NOT pause if the site fetches. Prefer cube.dev stories; drop Cube Logistics."
+Priya Shah,Product Manager,Meta,,,Single-token brand Meta vs other Metas,edge1_meta_pause,PAUSE (Meta is short). Ask for website.
+Priya Shah,Product Manager,Meta,,https://www.meta.com,Meta with homepage,edge1_meta_with_site,No pause if site fetches. Hook must be this Meta (Facebook parent) not a lookalike.
+Alex Rivera,Engineer,Apex,,,Single-token brand Apex (many unrelated orgs),edge1_apex_pause,PAUSE. Continue anyway → likely HOLD or weak suspect pool.
+Ed Bastian,CEO,Delta,,https://www.delta.com,Same short name — Delta Air Lines vs Delta Faucet vs other Deltas,edge1_delta_with_site,"No pause if site fetches. Hook must be the airline (delta.com) not Delta Faucet."
+Jeff Bezos,Executive Chairman,Amazon,,https://www.amazon.com,"Person–company split — public news also covers Blue Origin, Earth Fund, Washington Post.",edge2_person_split,"Draft only if the hook names Amazon. Blue Origin-only stories cannot be the hook."
+Elon Musk,CEO,Tesla,,https://www.tesla.com,Person–company split — also SpaceX xAI Neuralink coverage,edge2_person_split,"Sendable hook must name Tesla. SpaceX/xAI-only news is not the Tesla email."
+Jeff Bezos,Founder,Blue Origin,,https://www.blueorigin.com,Contrast to the Amazon row — here Blue Origin IS the target company,edge2_split_contrast,Blue Origin stories are valid here. Amazon-only news should not be the hook.
+Riven Kade,COO,Northloop Bindery,,,Quiet/private company with no real public news footprint,edge3_hold,HOLD — no confirmed hook. Gmail and Refine off. Store hold is not a win in memory.
+Meera Iyer,Founder,Palletlane Analytics,,,Low-coverage company — do not invent a hook,edge3_hold,HOLD. Add LinkedIn or a legal name and re-run to recover.
+Tomás Alves,Head of Ops,Quillmere Labs,,,Accented name + obscure company,edge3_hold_international,HOLD. Name with accent still requires an exact company hook.
+Kelly Ortberg,CEO,Boeing,,https://www.boeing.com,Sensitive news — safety lawsuits investigations often dominate,edge4_sensitive,"If a safer exact Boeing hook exists pick that. If the hook is still sensitive: no congratulations banner confidence capped at Medium."
+Lip-Bu Tan,CEO,Intel,,https://www.intel.com,Sensitive news — layoffs and restructuring often in the feed,edge4_sensitive,Prefer non-layoff Intel news when available. Never congratulate a layoff.
+Andy Jassy,CEO,Amazon,,https://www.amazon.com,Sensitive + happy mix — Amazon has product news and labor/layoff stories,edge4_prefer_safer,Prefer a non-sensitive Amazon hook over layoffs or lawsuits.
+John Smith,Director,IBM,,https://www.ibm.com,Very common name — hard person match even at a known company,residual_common_name,"Website skips pause. Person match may be weak; LinkedIn would help. HOLD if the person is not confirmed."
+John Smith,Director,IBM,,,Common name and short company with no website,residual_common_name_pause,PAUSE because IBM is a short token. After continue person match is still risky.
+Jane Park,Manager,Cube,https://www.linkedin.com/in/jane-park-not-a-real-profile-xyz999,,LinkedIn URL present but the page will not be readable,agent_linkedin_unreadable,"PAUSE — ask for a company website. Do not silently guess which Cube."
+Demis Hassabis,CEO,Google DeepMind,,https://deepmind.google,Multi-word name that still contains a short token (Google),happy_workplace_site,No pause if site fetches. Hook about DeepMind/Google DeepMind not an unrelated Google story.
+Daniel Dines,CEO,UiPath,,https://www.uipath.com,Mid-cap public company with product news,happy_midcap,Draft with a UiPath product or earnings hook.
+,VP Sales,Acme Inc,,,,parser_skip_no_name,Bulk should skip this row (missing fullName) and show an error. Not researched.
+Jane Blank,Director,,,,,parser_skip_no_company,Bulk should skip this row (missing company) and show an error. Not researched.
