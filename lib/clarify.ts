@@ -87,11 +87,16 @@ export function buildClarifyRequest(
       placeholder: company,
       suggestions: uniqueSuggestions([...hints, company], ""),
     });
+    const domainHint = (linkedIn?.domainHints || [])[0];
     questions.push({
       id: "website",
       field: "companyWebsite",
       prompt: "Company website (best way to tell lookalikes apart)",
-      placeholder: "https://company.com",
+      placeholder: domainHint
+        ? domainHint.includes("://")
+          ? domainHint
+          : `https://${domainHint}`
+        : "https://company.com",
       suggestions: uniqueSuggestions(
         (linkedIn?.domainHints || []).map((d) => (d.includes("://") ? d : `https://${d}`)),
         prospect.companyWebsite || ""
@@ -111,17 +116,17 @@ export function buildClarifyRequest(
       id: "notes",
       field: "notes",
       prompt: "Anything else that identifies this org (legal name, product, city)",
-      placeholder: "e.g. cube.dev — analytics warehouse, not Cube Logistics",
+      placeholder: `e.g. legal name, product, or city — not a lookalike of ${company}`,
     });
   } else if (needsName && !hasWebsite) {
     reasons.push(
-      `"${company}" is a short or collision-prone name. Is this cube.dev, Cube Logistics, or something else? A website (or a more specific company name) keeps the draft on the right org.`
+      `"${company}" is a short or collision-prone name. Several unrelated orgs share names like this. A website (or a more specific company name) keeps the draft on the right org.`
     );
     questions.push({
       id: "website",
       field: "companyWebsite",
       prompt: `Company website for ${company}`,
-      placeholder: "https://cube.dev",
+      placeholder: "https://company.com",
     });
     questions.push({
       id: "company",

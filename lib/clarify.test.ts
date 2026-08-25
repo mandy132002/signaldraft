@@ -90,8 +90,29 @@ describe("clarify — mid-run questions", () => {
       0
     );
     assert.ok(req);
-    assert.match(req!.reason, /cube\.dev|lookalike|collision/i);
+    assert.match(req!.reason, /collision|unrelated orgs/i);
     assert.ok(req!.questions.some((q) => q.field === "companyWebsite"));
+  });
+
+  it("uses generic placeholders, not Cube-specific examples", () => {
+    const meta = buildClarifyRequest({ fullName: "Jane", title: "", company: "Meta" }, null, null, 0);
+    assert.ok(meta);
+    const website = meta!.questions.find((q) => q.field === "companyWebsite");
+    assert.equal(website?.placeholder, "https://company.com");
+    assert.doesNotMatch(meta!.reason, /cube\.dev|Cube Logistics/i);
+    for (const q of meta!.questions) {
+      assert.doesNotMatch(q.placeholder || "", /cube\.dev|Cube Logistics/i);
+    }
+
+    const unread = buildClarifyRequest(
+      { fullName: "Jane", title: "", company: "Apex", linkedinUrl: "https://linkedin.com/in/jane" },
+      li({ fetched: false, note: "blocked" }),
+      null,
+      0
+    );
+    const notes = unread?.questions.find((q) => q.field === "notes");
+    assert.match(notes?.placeholder || "", /Apex/);
+    assert.doesNotMatch(notes?.placeholder || "", /cube\.dev/i);
   });
 
   it("does not ask again after the first round", () => {
