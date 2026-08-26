@@ -26,6 +26,8 @@ export function SenderContextFields({
 
   const dirtyVsProfile = !companyContextEquals(value, profile);
   const canSave = hasCompanyContext(value);
+  const nameOnlyProfile = Boolean(profile.senderName.trim()) && !profile.senderCompany.trim();
+  const savedTitle = nameOnlyProfile ? "Your profile" : "Your company";
 
   if (!loaded) {
     return (
@@ -61,7 +63,7 @@ export function SenderContextFields({
   return (
     <div className="sender-context">
       <div className="sender-context-head">
-        <p className="sender-context-title">{hasProfile && !override ? "Your company" : "You (SDR)"}</p>
+        <p className="sender-context-title">{hasProfile && !override ? savedTitle : "You (SDR)"}</p>
         {hasProfile && !override ? (
           <div className="sender-context-links">
             <Link href="/company">Edit profile</Link>
