@@ -41,7 +41,7 @@ export function Shell({
                 Dashboard
               </Link>
               <Link className={path.startsWith("/company") ? "active" : ""} href="/company">
-                Company
+                Profile
               </Link>
             </nav>
             <ThemeToggle />
